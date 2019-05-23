@@ -14,13 +14,13 @@ require "sys"
 require "net"
 require "utils"
 require "patch"
+require "wdt"
 --每1分钟查询一次GSM信号强度
 --每1分钟查询一次基站信息
 net.startQueryAll(8000, 60000)
 if rtos.get_version():upper():find("ASR1802") then
-    -- ril.request("AT+MEDCR=0,8,1")
-    else
-    require "wdt"
+    ril.request("AT+MEDCR=0,8,1")
+else
     wdt.setup(pio.P0_30, pio.P0_31)
 end
 --加载错误日志管理功能模块【强烈建议打开此功能】

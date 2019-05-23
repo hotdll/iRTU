@@ -1,1 +1,1 @@
-https://github.com/hotdll/irtu-asr1802/releases
+https://github.com/hotdll/iRTU/releases
