@@ -118,7 +118,7 @@ end
 ---------------------------------------------------------- 用户控制 GPIO 配置 ----------------------------------------------------------
 -- 用户可用IO列表
 local pios = is4gLod and {
-    pio23 = pins.setup(23, 0, pio.PULLUP), -- 默认U1的485-DIR
+    pio23 = pins.setup(23, 0, pio.PULLUP), -- 默认UART1的485方向控制脚
     pio26 = pins.setup(26, nil, pio.PULLDOWN),
     pio27 = pins.setup(27, nil, pio.PULLDOWN),
     pio28 = pins.setup(28, nil, pio.PULLDOWN),
@@ -130,7 +130,7 @@ local pios = is4gLod and {
     -- pio54 = pins.setup(54, nil, pio.PULLDOWN),
     pio55 = pins.setup(55, nil, pio.PULLDOWN),
     pio56 = pins.setup(56, nil, pio.PULLDOWN),
-    pio59 = pins.setup(59, 0, pio.PULLUP), -- 默认U2的485-DIR
+    pio59 = pins.setup(59, 0, pio.PULLUP), -- 默认UART2的485方向控制脚
     pio62 = pins.setup(62, nil, pio.PULLDOWN),
     pio63 = pins.setup(63, nil, pio.PULLDOWN),
     pio64 = pins.setup(64, nil, pio.PULLDOWN), -- NETLED
@@ -151,9 +151,9 @@ local pios = is4gLod and {
     pio80 = pins.setup(80, nil, pio.PULLDOWN),
     pio81 = pins.setup(81, nil, pio.PULLDOWN),
 } or {
-    pio2 = pins.setup(pio.P0_2, nil, pio.PULLDOWN), -- 默认485方向控制
+    pio2 = pins.setup(pio.P0_2, nil, pio.PULLDOWN), -- 默认UART1的485方向控制脚
     pio3 = pins.setup(pio.P0_3, nil, pio.PULLDOWN), -- 默认netready信号
-    pio6 = pins.setup(pio.P0_6, nil, pio.PULLDOWN),
+    pio6 = pins.setup(pio.P0_6, nil, pio.PULLDOWN), -- 默认UART2的485方向控制脚
     pio7 = pins.setup(pio.P0_7, nil, pio.PULLDOWN),
     pio8 = pins.setup(pio.P0_8, nil, pio.PULLDOWN),
     pio9 = pins.setup(pio.P0_9, nil, pio.PULLDOWN),
@@ -320,7 +320,7 @@ local function read(uid)
         elseif second == "0" then
             -- 参数保存
             local password = ""
-            dtu.passon, dtu.plate, dtu.convert, dtu.reg, dtu.param_ver, dtu.flow, dtu.fota, dtu.uartReadTime, dtu.pwrmod, password = unpack(t)
+            dtu.passon, dtu.plate, dtu.convert, dtu.reg, dtu.param_ver, dtu.flow, dtu.fota, dtu.uartReadTime, dtu.pwrmod, password, dtu.netReadTime, dtu.nolog = unpack(t)
             if password == dtu.password or dtu.password == "" or dtu.password == nil then
                 dtu.password = password
                 io.writeFile(CONFIG, json.encode(dtu))
@@ -341,8 +341,12 @@ local function read(uid)
             dtu.cmds[idx] = t
             write(uid, "OK\r\n")
         elseif tonumber(second) then
-            -- 通道设置
+            -- 通道设置,除了以上数字,其他数字都到这里
             dtu.conf[tonumber(second)] = t
+            write(uid, "OK\r\n")
+        elseif second == "pins" then
+            -- 自定义GPIO
+            dtu.pins = t
             write(uid, "OK\r\n")
         elseif second == "readconfig" then
             -- 读取DTU的参数配置
@@ -488,9 +492,13 @@ local function read(uid)
         sys.taskInit(function(uid, prot, ip, port, ssl, timeout, data)
             local c = prot:upper() == "TCP" and socket.tcp(ssl and ssl:lower() == "ssl") or socket.udp()
             while not c:connect(ip, port) do sys.wait(2000) end
-            if c:send(data) then write(uid, "SEND_OK\r\n") end
-            local r, s = c:recv(timeout * 1000)
-            if r then write(uid, s) end
+            if c:send(data) then
+                write(uid, "SEND_OK\r\n")
+                local r, s = c:recv(timeout * 1000)
+                if r then write(uid, s) end
+            else
+                write(uid, "SEND_ERR\r\n")
+            end
             c:close()
         end, uid, unpack(t))
         return
