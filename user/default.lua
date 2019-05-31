@@ -117,7 +117,7 @@ if io.exists(CONFIG) then
 end
 ---------------------------------------------------------- 用户控制 GPIO 配置 ----------------------------------------------------------
 -- 用户可用IO列表
-local pios = is4gLod and {
+pios = is4gLod and {
     pio23 = pins.setup(23, 0, pio.PULLUP), -- 默认UART1的485方向控制脚
     pio26 = pins.setup(26, nil, pio.PULLDOWN),
     pio27 = pins.setup(27, nil, pio.PULLDOWN),

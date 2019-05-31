@@ -14,10 +14,8 @@ module(..., package.seeall)
 
 -- 解除报警的等待时间秒,GPS打开的起始时间utc秒
 local clearTime, startTime = 300, 0
-
 -- 轨迹消息缓冲区
 local trackFile = {{}, {}, {}, {}, {}, {}, {}, {}, {}, {}}
-
 -- 传感器数据
 local sens = {
     vib = false, -- 震动检测
@@ -28,29 +26,31 @@ local sens = {
     wup = false, -- 唤醒检测
     vcc = 0, -- 电池电压
 }
-
 ----------------------------------------------------------传感器部分----------------------------------------------------------
 -- 配置GPS用到的IO: led脚，vib震动输入脚，ACC输入脚,内置电池充电状态监视脚,adc通道,分压比
-function sensMonitor(ledio, vibio, accio, chgio, adcio, ratio)
+function sensMonitor(ledio, vibio, accio, chgio, adcid, ratio)
     -- 点火监测采样队列
     local powerVolt, adcQue, acc, chg = 0, {0, 0, 0, 0, 0}
     -- GPS 定位成功指示灯
-    if ledio and ledio ~= "" then
+    if ledio and default.pios[ledio] then
+        default.pios[ledio] = nil
         local led = pins.setup(tonumber(ledio:sub(4, -1)), 0)
         sys.subscribe("GPS_MSG_REPORT", led)
-        sys.subscribe("GPS_MSG_NOREPORT", led)
     end
     -- 震动传感器检测
-    if vibio and vibio ~= "" then
+    if vibio and default.pios[vibio] then
         pins.setup(tonumber(vibio:sub(4, -1)), function(msg) if msg == cpu.INT_GPIO_NEGEDGE then sens.vib = true end end, pio.PULLUP)
+        default.pios[vibio] = nil
     end
     -- ACC开锁检测
-    if accio and accio ~= "" then
+    if accio and default.pios[accio] then
         acc = pins.setup(tonumber(accio:sub(4, -1)), nil, pio.PULLUP)
+        default.pios[accio] = nil
     end
     -- 内置锂电池充电状态监控脚
-    if chgio and chgio ~= "" then
+    if chgio and default.pios[chgio] then
         chg = pins.setup(tonumber(chgio:sub(4, -1)), nil, pio.PULLUP)
+        default.pios[chgio] = nil
     end
     adc.open(tonumber(adcid) or 0)
     while true do
@@ -67,7 +67,7 @@ function sensMonitor(ledio, vibio, accio, chgio, adcio, ratio)
                 sens.act = false
             end
         end
-        sens.acc, sens.chg = acc() == 0, chg() == 0
+        sens.acc, sens.chg = acc and acc() == 0, chg and chg() == 0
         sens.vcc, sens.und = voltValue, voltValue < 4000
         sys.wait(1000)
         sens.vib = false

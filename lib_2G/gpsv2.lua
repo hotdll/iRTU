@@ -224,7 +224,8 @@ function open(id, baudrate, mode, sleepTm, fnc)
     sleepTm = tonumber(sleepTm) and sleepTm * 1000 or 5000
     pm.wake("gpsv2.lua")
     uartID, uartBaudrate = tonumber(id) or uartID, tonumber(baudrate) or uartBaudrate
-    log.info("GPS-UARTR-ID and buad:", id, baudrate, uartID, uartBaudrate)
+    -- log.info("GPS-UARTR-ID and buad:", id, baudrate, uartID, uartBaudrate)
+    uart.close(uartID)
     uart.setup(uartID, uartBaudrate, 8, uart.PAR_NONE, uart.STOP_1)
     if fnc and type(fnc) == "function" then
         fnc()
