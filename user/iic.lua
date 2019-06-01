@@ -37,6 +37,7 @@ function am2320(id, addr)
     data = data:sub(1, 6)
     if crc == crypto.crc16_modbus(data, 6) then
         local _, hum, tmp = pack.unpack(string.sub(data, 3, -1), '>H2')
+        if tmp == nil or hum == nil then return 0, 0 end
         if tmp >= 0x8000 then tmp = 0x8000 - tmp end
         if float then
             tmp, hum = tmp / 10, hum / 10
@@ -64,9 +65,9 @@ function sht(id, addr)
     hum = i2c.recv(id, addr, 2)
     log.info("SHT读取到的湿度寄存器24位值:", hum:toHex())
     i2c.close(id)
-    if tmp == nil or hum == nil then return end
     _, tmp = pack.unpack(tmp, '>H')
     _, hum = pack.unpack(hum, '>H')
+    if tmp == nil or hum == nil then return 0, 0 end
     tmp = bit.band(tmp, 0xFFFC)
     hum = bit.band(hum, 0xFFFC)
     if float then

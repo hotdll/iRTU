@@ -282,6 +282,106 @@ local function writeDone(uid)
     end
 end
 
+-- DTU配置工具默认的方法表
+local cmd = {}
+cmd.config = {
+    ["pipe"] = function(t, num)dtu.conf[tonumber(num)] = t return "OK" end, -- "1"-"7" 为通道配置
+    ["A"] = function(t)dtu.apn = t return "OK" end, -- APN 配置
+    ["B"] = function(t)dtu.cmds[tonumber(table.remove(t, 1)) or 1] = t return "OK" end, -- 自动任务下发配置
+    ["pins"] = function(t)dtu.pins = t return "OK" end, -- 自定义GPIO
+    ["host"] = function(t)dtu.host = t[1] return "OK" end, -- 自定义参数升级服务器
+    ["0"] = function(t)-- 读取整个DTU的参数配置
+        local password = ""
+        dtu.passon, dtu.plate, dtu.convert, dtu.reg, dtu.param_ver, dtu.flow, dtu.fota, dtu.uartReadTime, dtu.pwrmod, password, dtu.netReadTime, dtu.nolog = unpack(t)
+        if password == dtu.password or dtu.password == "" or dtu.password == nil then
+            dtu.password = password
+            io.writeFile(CONFIG, json.encode(dtu))
+            sys.timerStart(sys.restart, 1000, "Setting parameters have been saved!")
+            return "OK"
+        else
+            return "PASSWORD ERROR"
+        end
+    end,
+    ["8"] = function(t)-- 串口配置默认方法
+        local tmp = "1200,2400,4800,9600,14400,19200,28800,38400,57600,115200,230400,460800,921600"
+        if t[1] and t[2] and t[3] and t[4] and t[5] then
+            if ("1,2"):find(t[1]) and tmp:find(t[2]) and ("7,8"):find(t[3]) and ("0,1,2"):find(t[4]) and ("0,2"):find(t[5]) then
+                dtu.uconf[t[1]] = t
+                return "OK"
+            else
+                return "ERROR"
+            end
+        end
+    end,
+    ["9"] = function(t)-- 预置白名单
+        dtu.preset.number, dtu.preset.delay, dtu.preset.smsword = unpack(t)
+        dtu.preset.delay = tonumber(dtu.preset.delay) or 1
+        return "OK"
+    end,
+    ["readconfig"] = function(t)-- 读取整个DTU的参数配置
+        if t[1] == dtu.password or dtu.password == "" or dtu.password == nil then
+            if io.exists(CONFIG) and io.readFile(CONFIG) then return "OK" end
+            return "ERROR"
+        else
+            return "PASSWORD ERROR"
+        end
+    end,
+    ["writeconfig"] = function(t, s)-- 读取整个DTU的参数配置
+        local str = s:match("(.+)\r\n") and s:match("(.+)\r\n"):sub(20, -1) or s:sub(20, -1)
+        local dat, result, errinfo = json.decode(str)
+        if result then
+            if dtu.password == dat.password or dtu.password == "" or dtu.password == nil then
+                io.writeFile(CONFIG, str)
+                sys.timerStart(sys.restart, 1000, "Setting parameters have been saved!")
+                return "OK"
+            else
+                return "JSON ERROR"
+            end
+        else
+            return "ERROR"
+        end
+    end
+}
+cmd.rrpc = {
+    ["getver"] = function(t) return "rrpc,getver," .. _G.VERSION end,
+    ["getcsq"] = function(t) return "rrpc,getcsq," .. (net.getRssi() or "error ") end,
+    ["getadc"] = function(t) return "rrpc,getadc," .. create.getADC(tonumber(t[1]) or 0) end,
+    ["reboot"] = function(t)sys.timerStart(sys.restart, 1000, "Remote reboot!") return "OK" end,
+    ["getimei"] = function(t) return "rrpc,getimei," .. (misc.getImei() or "error") end,
+    ["getimsi"] = function(t) return "rrpc,getimsi," .. (sim.getImsi() or "error") end,
+    ["getvbatt"] = function(t) return "rrpc,getvbatt," .. misc.getVbatt() end,
+    ["geticcid"] = function(t) return "rrpc,geticcid," .. (sim.getIccid() or "error") end,
+    ["getproject"] = function(t) return "rrpc,getproject," .. _G.PROJECT end,
+    ["getlocation"] = function(t) return "rrpc,location," .. (lbs.lat or 0) .. "," .. (lbs.lng or 0) end,
+    ["getreallocation"] = function(t)
+        lbsLoc.request(function(result, lat, lng, addr)
+            if result then
+                lbs.lat, lbs.lng = lat, lng
+                create.setLocation(lat, lng)
+            end
+        end)
+        return "rrpc,location," .. (lbs.lat or 0) .. "," .. (lbs.lng or 0)
+    end,
+    ["gettime"] = function(t)
+        if ntp.isEnd() then
+            local c = misc.getClock()
+            return "rrpc,nettime," .. string.format("%04d,%02d,%02d,%02d,%02d,%02d\r\n", c.year, c.month, c.day, c.hour, c.min, c.sec)
+        else
+            return "rrpc,nettime,error"
+        end
+    end,
+    ["setpio"] = function(t) if pios["pio" .. t[1]] then pios["pio" .. t[1]](tonumber(t[2]) or 0) return "OK" end return "ERROR" end,
+    ["getpio"] = function(t) if pios["pio" .. t[1]] then return "rrpc,getpio" .. t[1] .. "," .. pios["pio" .. t[1]]() end return "ERROR" end,
+    ["getsht"] = function(t) local tmp, hum = iic.sht(2, tonumber(t[1])) return "rrpc,getsht," .. (tmp or 0) .. "," .. (hum or 0) end,
+    ["getam2320"] = function(t) local tmp, hum = iic.am2320(2, tonumber(t[1])) return "rrpc,getam2320," .. (tmp or 0) .. "," .. (hum or 0) end,
+    ["netstatus"] = function(t) return "rrpc,netstatus," .. (create.getDatalink() and "RDY" or "NORDY") end,
+    ["gps_wakeup"] = function(t)sys.publish("REMOTE_WAKEUP") return "rrpc,gps_wakeup,OK" end,
+    ["gps_getsta"] = function(t) return "rrpc,gps_getsta," .. tracker.deviceMessage(t[1] or "json") end,
+    ["gps_getmsg"] = function(t) return "rrpc,gps_getmsg," .. tracker.locateMessage(t[1] or "json") end,
+    ["upconfig"] = function(t)sys.publish("UPDATE_DTU_CNF") return "rrpc,upconfig,OK" end,
+}
+
+-- 串口读指令
 local function read(uid)
     local s = table.concat(recvBuff[uid])
     recvBuff[uid] = {}
@@ -299,183 +399,21 @@ local function read(uid)
         sys.restart("Restore default parameters:", "OK")
     end
     -- DTU的参数配置
-    if s:sub(1, 7) == "config," then
+    if s:sub(1, 7) == "config," or s:sub(1, 5) == "rrpc," then
         local t = s:match("(.+)\r\n") and s:match("(.+)\r\n"):split(',') or s:split(',')
         local first = table.remove(t, 1)
-        local second = table.remove(t, 1)
-        if second == "8" then
-            -- 串口配置部分
-            t[1], t[2], t[3], t[4], t[5] = tonumber(t[1]), tonumber(t[2]), tonumber(t[3]), tonumber(t[4]), tonumber(t[5])
-            if t[1] and t[2] and t[3] and t[4] and t[5] then
-                local tmp = "1200,2400,4800,9600,14400,19200,28800,38400,57600,115200,230400,460800,921600"
-                if ("1,2"):find(t[1]) and tmp:find(t[2]) and ("7,8"):find(t[3]) and ("0,1,2"):find(t[4]) and ("0,2"):find(t[5]) then
-                    dtu.uconf[t[1]] = t
-                    write(uid, "OK\r\n")
-                else
-                    write(uid, "ERROR\r\n")
-                end
-            else
-                write(uid, "ERROR\r\n")
-            end
-        elseif second == "0" then
-            -- 参数保存
-            local password = ""
-            dtu.passon, dtu.plate, dtu.convert, dtu.reg, dtu.param_ver, dtu.flow, dtu.fota, dtu.uartReadTime, dtu.pwrmod, password, dtu.netReadTime, dtu.nolog = unpack(t)
-            if password == dtu.password or dtu.password == "" or dtu.password == nil then
-                dtu.password = password
-                io.writeFile(CONFIG, json.encode(dtu))
-                write(uid, "OK\r\n")
-                sys.restart("Setting parameters have been saved!")
-            else
-                write(uid, "PASSWORD ERROR\r\n")
-            end
-        elseif second == "9" then
-            dtu.preset.number, dtu.preset.delay, dtu.preset.smsword = unpack(t)
-            dtu.preset.delay = tonumber(dtu.preset.delay) or 1
-            write(uid, "OK\r\n")
-        elseif second:upper() == "A" then
-            dtu.apn = t
-            write(uid, "OK\r\n")
-        elseif second:upper() == "B" then
-            local idx = table.remove(t, 1)
-            dtu.cmds[idx] = t
-            write(uid, "OK\r\n")
-        elseif tonumber(second) then
-            -- 通道设置,除了以上数字,其他数字都到这里
-            dtu.conf[tonumber(second)] = t
-            write(uid, "OK\r\n")
-        elseif second == "pins" then
-            -- 自定义GPIO
-            dtu.pins = t
-            write(uid, "OK\r\n")
-        elseif second == "readconfig" then
-            -- 读取DTU的参数配置
-            if t[1] == dtu.password or dtu.password == "" or dtu.password == nil then
-                write(uid, io.exists(CONFIG) and io.readFile(CONFIG) .. "\r\n" or "ERROR\r\n")
-            else
-                write(uid, "PASSWORD ERROR\r\n")
-            end
-        elseif second == "writeconfig" then
-            local str = s:match("(.+)\r\n") and s:match("(.+)\r\n"):sub(20, -1) or s:sub(20, -1)
-            local dat, result, errinfo = json.decode(str)
-            if result then
-                if dtu.password == dat.password or dtu.password == "" or dtu.password == nil then
-                    io.writeFile(CONFIG, str)
-                    write(uid, "OK\r\n")
-                    sys.restart("Setting parameters have been saved!")
-                else
-                    write(uid, "PASSWORD ERROR\r\n")
-                end
-            else
-                write(uid, "JSON ERROR\r\n")
-            end
-        elseif second == "host" then
-            dtu.host = t[1]
-            write(uid, "OK\r\n")
+        local second = table.remove(t, 1) or ""
+        if tonumber(second) and tonumber(second) > 0 and tonumber(second) < 8 then
+            write(uid, cmd[first]["pipe"](t, second) .. "\r\n")
+            return
         else
-            write(uid, "ERROR\r\n")
+            if cmd[first][second] then write(uid, cmd[first][second](t, s) .. "\r\n") return end
         end
-        return
     end
-    -- DTU的函数功能部分
-    if s:sub(1, 5) == "rrpc," then
-        local t = s:match("(.+)\r\n") and s:match("(.+)\r\n"):split(',') or s:split(',')
-        local first = table.remove(t, 1)
-        local second = table.remove(t, 1)
-        if second == "getlocation" then
-            if lbs.lat and lbs.lng then
-                write(uid, "rrpc,location," .. (lbs.lat or 0) .. "," .. (lbs.lng or 0) .. "\r\n")
-            else
-                lbsLoc.request(function(result, lat, lng, addr)
-                    if result then
-                        lbs.lat, lbs.lng = lat, lng
-                        create.setLocation(lat, lng)
-                        log.info("基站定位请求的结果:", lat or 0, lng or 0)
-                        write(uid, "rrpc,location," .. (lbs.lat or 0) .. "," .. (lbs.lng or 0) .. "\r\n")
-                    else
-                        write(uid, "rrpc,location,error\r\n")
-                    end
-                end)
-            end
-        elseif second == "getreallocation" then
-            lbsLoc.request(function(result, lat, lng, addr)
-                if result then
-                    lbs.lat, lbs.lng = lat, lng
-                    create.setLocation(lat, lng)
-                    log.info("基站定位请求的结果:", lat or 0, lng or 0)
-                    write(uid, "rrpc,location," .. (lbs.lat or 0) .. "," .. (lbs.lng or 0) .. "\r\n")
-                else
-                    write(uid, "rrpc,location,error\r\n")
-                end
-            end)
-        elseif second == "gettime" then
-            if ntp.isEnd() then
-                local c = misc.getClock()
-                write(uid, "rrpc,nettime," .. string.format("%04d,%02d,%02d,%02d,%02d,%02d\r\n", c.year, c.month, c.day, c.hour, c.min, c.sec))
-            else
-                write(uid, "rrpc,nettime,error\r\n")
-            end
-        elseif second == "reboot" then
-            write(uid, "OK\r\n")
-            sys.restart("Remote reboot!")
-        elseif second == "getadc" then
-            write(uid, "rrpc,getadc," .. create.getADC(tonumber(t[1]) or 0) .. "\r\n")
-        elseif second == "getvbatt" then
-            write(uid, "rrpc,getvbatt," .. misc.getVbatt() .. "\r\n")
-        elseif second == "getcsq" then
-            write(uid, "rrpc,getcsq," .. (net.getRssi() or "error ") .. "\r\n")
-        elseif second == "getver" then
-            write(uid, "rrpc,getver," .. _G.VERSION .. "\r\n")
-        elseif second == "getproject" then
-            write(uid, "rrpc,getproject," .. _G.PROJECT .. "\r\n")
-        elseif second == "getimei" then
-            write(uid, "rrpc,getimei," .. (misc.getImei() or "error") .. "\r\n")
-        elseif second == "getimsi" then
-            write(uid, "rrpc,getimsi," .. (sim.getImsi() or "error") .. "\r\n")
-        elseif second == "geticcid" then
-            write(uid, "rrpc,geticcid," .. (sim.getIccid() or "error") .. "\r\n")
-        elseif second == "setpio" then
-            if pios["pio" .. t[1]] then
-                pios["pio" .. t[1]](tonumber(t[2]) or 0)pios["pio" .. t[1]](tonumber(t[2]) or 0)
-                write(uid, "OK\r\n")
-            else
-                write(uid, "ERROR\r\n")
-            end
-        elseif second == "getpio" then
-            if pios["pio" .. t[1]] then
-                write(uid, "rrpc,getpio" .. t[1] .. "," .. pios["pio" .. t[1]]() .. "\r\n")
-            else
-                write(uid, "ERROR\r\n")
-            end
-        elseif second == "getsht" then
-            local tmp, hum = iic.sht(2, tonumber(t[1]))
-            write(uid, "rrpc,getsht," .. (tmp or 0) .. "," .. (hum or 0) .. "\r\n")
-        elseif second == "getam2320" then
-            local tmp, hum = iic.am2320(2, tonumber(t[1]))
-            write(uid, "rrpc,getam2320," .. (tmp or 0) .. "," .. (hum or 0) .. "\r\n")
-        elseif second == "netstatus" then
-            write(uid, "rrpc,netstatus," .. (create.getDatalink() and "OK" or "ERROR") .. "\r\n")
-        elseif second == "gps_wakeup" then
-            sys.publish("REMOTE_WAKEUP")
-            write(uid, "rrpc,gps_wakeup," .. "OK\r\n")
-        elseif second == "gps_getsta" then
-            write(uid, "rrpc,gps_getsta," .. tracker.deviceMessage(t[1] or "json") .. "\r\n")
-        elseif second == "gps_getmsg" then
-            write(uid, "rrpc,gps_getmsg," .. tracker.locateMessage(t[1] or "json") .. "\r\n")
-        elseif second == "upconfig" then
-            sys.publish("UPDATE_DTU_CNF")
-            write(uid, "rrpc,upconfig," .. "OK\r\n")
-        else
-            write(uid, "ERROR\r\n")
-        end
-        return
-    end
+    -- 执行单次HTTP指令
     if s:sub(1, 5) == "http," then
         local t = s:match("(.+)\r\n") and s:match("(.+)\r\n"):split(',') or s:split(',')
-        if not socket.isReady() then
-            write(uid, "NET_NORDY\r\n")
-            return
-        end
+        if not socket.isReady() then write(uid, "NET_NORDY\r\n") return end
         sys.taskInit(function(t, uid)
             local code, head, body = httpv2.request(t[2]:upper(), t[3], (t[4] or 10) * 1000, nil, t[5], tonumber(t[6]) or 1, t[7], t[8])
             log.info("uart http response:", body)
@@ -483,6 +421,7 @@ local function read(uid)
         end, t, uid)
         return
     end
+    -- 执行单次SOCKET透传指令
     if s:sub(1, 4):upper() == "TCP," or s:sub(1, 4):upper() == "UDP," then
         local t = s:match("(.+)\r\n") and s:match("(.+)\r\n"):split(',') or s:split(',')
         if not socket.isReady() then
