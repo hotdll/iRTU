@@ -95,52 +95,10 @@ end
 -- 用户可用API
 local function userapi(str, pios)
     local t = str:match("(.-)\r?\n") and str:match("(.-)\r?\n"):split(',') or str:split(',')
-    if string.lower(t[2]) == "setpio" then
-        pios["pio" .. t[3]](tonumber(t[4]) or 0)
-        return "rrpc,setpio" .. t[3] .. "," .. t[4] or 0
-    elseif string.lower(t[2]) == "getpio" then
-        return "rrpc,getpio" .. t[3] .. "," .. pios["pio" .. t[3]]()
-    elseif string.lower(t[2]) == "getadc" then
-        return "rrpc,getadc" .. t[3] .. "," .. getADC(tonumber(t[3]))
-    elseif string.lower(t[2]) == "getvbatt" then
-        return "rrpc,getvbatt" .. "," .. misc.getVbatt()
-    elseif string.lower(t[2]) == "getcsq" then
-        return "rrpc,csq," .. net.getRssi()
-    elseif string.lower(t[2]) == "getver" then
-        return "rrpc,getver," .. _G.VERSION
-    elseif string.lower(t[2]) == "getproject" then
-        return "rrpc,getproject," .. _G.PROJECT
-    elseif string.lower(t[2]) == "getimei" then
-        return "rrpc,getimei," .. misc.getImei()
-    elseif string.lower(t[2]) == "getimsi" then
-        return "rrpc,getimsi," .. sim.getImsi()
-    elseif string.lower(t[2]) == "geticcid" then
-        return "rrpc,geticcid," .. sim.getIccid()
-    elseif string.lower(t[2]) == "getlocation" then
-        return "rrpc,getlocation," .. (lat or 0) .. "," .. (lng or 0)
-    elseif string.lower(t[2]) == "getreallocation" then
-        lbsLoc.request(function(result, lat, lng, addr) if result then setLocation(lat, lng) end end)
-        return "rrpc,getreallocation," .. (lat or 0) .. "," .. (lng or 0)
-    elseif string.lower(t[2]) == "getsht" then
-        local tmp, hum = iic.sht(2, tonumber(t[3]))
-        return "rrpc,getsht," .. (tmp or 0) .. "," .. (hum or 0)
-    elseif string.lower(t[2]) == "getam2320" then
-        local tmp, hum = iic.am2320(2, tonumber(t[3]))
-        return "rrpc,getam2320," .. (tmp or 0) .. "," .. (hum or 0)
-    elseif string.lower(t[2]) == "function" then
-        return "rrpc,function," .. (loadstring(str:sub(15, -1))() or "OK")
-    elseif string.lower(t[2]) == "gps_wakeup" then
-        sys.publish("REMOTE_WAKEUP")
-        return "rrpc,gps_wakeup," .. "OK"
-    elseif string.lower(t[2]) == "gps_getsta" then
-        return "rrpc,gps_getsta," .. tracker.deviceMessage(t[3] or "json")
-    elseif string.lower(t[2]) == "gps_getmsg" then
-        return "rrpc,gps_getmsg," .. tracker.locateMessage(t[3] or "json")
-    elseif string.lower(t[2]) == "reboot" then
-        sys.restart("Remote reboot!")
-    elseif string.lower(t[2]) == "upconfig" then
-        sys.publish("UPDATE_DTU_CNF")
-        return "rrpc,upconfig," .. "OK"
+    local rrpc = table.remove(t, 1)
+    local reqcmd = table.remove(t, 1)
+    if default.cmd[rrpc] and default.cmd[rrpc][reqcmd] then
+        return default.cmd[rrpc][reqcmd](t)
     else
         return "ERROR"
     end

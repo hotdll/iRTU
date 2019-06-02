@@ -283,7 +283,7 @@ local function writeDone(uid)
 end
 
 -- DTU配置工具默认的方法表
-local cmd = {}
+cmd = {}
 cmd.config = {
     ["pipe"] = function(t, num)dtu.conf[tonumber(num)] = t return "OK" end, -- "1"-"7" 为通道配置
     ["A"] = function(t)dtu.apn = t return "OK" end, -- APN 配置
@@ -379,6 +379,7 @@ cmd.rrpc = {
     ["gps_getsta"] = function(t) return "rrpc,gps_getsta," .. tracker.deviceMessage(t[1] or "json") end,
     ["gps_getmsg"] = function(t) return "rrpc,gps_getmsg," .. tracker.locateMessage(t[1] or "json") end,
     ["upconfig"] = function(t)sys.publish("UPDATE_DTU_CNF") return "rrpc,upconfig,OK" end,
+    ["function"] = function(t)log.info("rrpc,function:",table.concat(t, ",")) return "rrpc,function," .. (loadstring(table.concat(t, ","))() or "OK") end
 }
 
 -- 串口读指令
