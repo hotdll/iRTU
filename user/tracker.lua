@@ -94,8 +94,8 @@ end
 -- 用户自定义上报GPS数据的报文顺序
 -- msg = {"isfix", "stamp", "lng", "lat", "altitude", "azimuth", "speed", "sateCno", "sateCnt"},
 function locateMessage(format)
-    local lng, lat = gpsv2.getIntLocation()
     local isFix = gpsv2.isFix()
+    local lng, lat = gpsv2.getIntLocation()
     local altitude = gpsv2.getAltitude()
     local azimuth = gpsv2.getAzimuth()
     local speed = gpsv2.getSpeed()
@@ -114,7 +114,7 @@ end
 function alert(uid, baud, pwmode, sleep, guard, format, num, sep, interval, cid)
     uid, baud, pwmode, sleep, num = tonumber(uid), tonumber(baud), tonumber(pwmode), tonumber(sleep), tonumber(num) or 0
     guard, interval = tonumber(guard) == 0, (tonumber(interval) or 0) * 60000
-    local cnt, report = 0, function(format)sys.publish("UART_RECV_ID" .. tonumber(cid) or uid, deviceMessage(format)) end
+    local cnt, report = 0, function(format)sys.publish("NET_SENT_RDY_" .. tonumber(cid) or uid, deviceMessage(format)) end
     while true do
         -- 布防判断
         if not gpsv2.isOpen() and (not guard or sens.vib or sens.acc or sens.act or sens.und or sens.wup) then
@@ -139,11 +139,11 @@ function alert(uid, baud, pwmode, sleep, guard, format, num, sep, interval, cid)
             -- 上报消息
             if sys.waitUntil("GPS_MSG_REPORT") then
                 if num == 0 then
-                    sys.publish("UART_RECV_ID" .. tonumber(cid) or uid, locateMessage(format))
+                    sys.publish("NET_SENT_RDY_" .. tonumber(cid) or uid, locateMessage(format))
                 else
                     cnt = cnt < num and cnt + 1 or 0
                     table.insert(trackFile, locateMessage(format))
-                    if cnt == 0 then sys.publish("UART_RECV_ID" .. tonumber(cid) or uid, table.concat(trackFile, sep)) end
+                    if cnt == 0 then sys.publish("NET_SENT_RDY_" .. tonumber(cid) or uid, table.concat(trackFile, sep)) end
                 end
             end
             sys.wait(100)
