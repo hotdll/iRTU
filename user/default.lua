@@ -320,7 +320,7 @@ cmd.config = {
     end,
     ["readconfig"] = function(t)-- 读取整个DTU的参数配置
         if t[1] == dtu.password or dtu.password == "" or dtu.password == nil then
-            if io.exists(CONFIG) and io.readFile(CONFIG) then return "OK" end
+            if io.exists(CONFIG) then return io.readFile(CONFIG) end
             return "ERROR"
         else
             return "PASSWORD ERROR"
@@ -379,7 +379,7 @@ cmd.rrpc = {
     ["gps_getsta"] = function(t) return "rrpc,gps_getsta," .. tracker.deviceMessage(t[1] or "json") end,
     ["gps_getmsg"] = function(t) return "rrpc,gps_getmsg," .. tracker.locateMessage(t[1] or "json") end,
     ["upconfig"] = function(t)sys.publish("UPDATE_DTU_CNF") return "rrpc,upconfig,OK" end,
-    ["function"] = function(t)log.info("rrpc,function:",table.concat(t, ",")) return "rrpc,function," .. (loadstring(table.concat(t, ","))() or "OK") end
+    ["function"] = function(t)log.info("rrpc,function:", table.concat(t, ",")) return "rrpc,function," .. (loadstring(table.concat(t, ","))() or "OK") end
 }
 
 -- 串口读指令
