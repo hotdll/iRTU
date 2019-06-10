@@ -2,7 +2,7 @@
 --PROJECT：ascii string类型，可以随便定义，只要不使用,就行
 --VERSION：ascii string类型，如果使用Luat物联云平台固件升级的功能，必须按照"X.X.X"定义，X表示1位数字；否则可随便定义
 PROJECT = "iRTU"
-VERSION = "1.8.4"
+VERSION = "1.8.5"
 PRODUCT_KEY = "DPVrZXiffhEUBeHOUwOKTlESam3aXvnR"
 
 --加载日志功能模块，并且设置日志输出等级
@@ -20,6 +20,8 @@ require "wdt"
 net.startQueryAll(8000, 60000)
 if rtos.get_version():upper():find("ASR1802") then
     ril.request("AT+MEDCR=0,8,1")
+    ril.request("AT+MEDCR=0,17,240")
+    ril.request("AT+MEDCR=0,19,1")
 else
     wdt.setup(pio.P0_30, pio.P0_31)
 end
