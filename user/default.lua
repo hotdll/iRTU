@@ -51,7 +51,7 @@ local dtu = {
     param_ver = 0, -- 参数版本
     flow = 0, -- 流量监控
     fota = 0, -- 远程升级
-    uartReadTime = 50, -- 串口读超时
+    uartReadTime = 500, -- 串口读超时
     netReadTime = 50, -- 网络读超时
     pwrmod = "normal",
     password = "",
@@ -335,10 +335,10 @@ cmd.config = {
                 sys.timerStart(sys.restart, 1000, "Setting parameters have been saved!")
                 return "OK"
             else
-                return "JSON ERROR"
+                return "PASSWORD ERROR"
             end
         else
-            return "ERROR"
+            return "JSON ERROR"
         end
     end
 }
@@ -484,7 +484,7 @@ function uart_INIT(i, uconf)
     uart.on(i, "sent", writeDone)
     uart.on(i, "receive", function(uid, length)
         table.insert(recvBuff[uid], uart.read(uid, length or 8192))
-        sys.timerStart(sys.publish, tonumber(dtu.uartReadTime) or 30, "UART_RECV_WAIT_" .. uid, uid)
+        sys.timerStart(sys.publish, tonumber(dtu.uartReadTime) or 500, "UART_RECV_WAIT_" .. uid, uid)
     end)
     -- 处理串口接收到的数据
     sys.subscribe("UART_RECV_WAIT_" .. i, read)

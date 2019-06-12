@@ -205,7 +205,7 @@ local function urc(data)
     if data == "RDY" then
         radioready = true
     else
-        local prefix = string.match(data, "([%+%^]*[%u%d& ]+)")
+        local prefix = string.match(data, "([%+%^%*]*[%u%d& ]+)")
         --执行prefix的urc处理函数，返回数据过滤器
         urcfilter = urctable[prefix](data, prefix)
     end
@@ -246,20 +246,20 @@ local function procatc(data)
     if data == "" then
         return
     end
-    
+
     if data:match("^%+EEMLTEINTER") or data:match("^%+EEMLTEINTRA") or data:match("^%+EEMUMTSINTER") or data:match("^%+EEMUMTSINTRA") then
         return
     end
     log.info("ril.proatc", data)
-    
+
     --当前无命令在执行则判定为urc
     if currcmd == nil then
         urc(data)
         return
     end
-    
+
     local isurc = false
-    
+
     --一些特殊的错误信息，转化为ERROR统一处理
     if data:match("^%+CMS ERROR:") or data:match("^%+CME ERROR:") then
         data = "ERROR"
@@ -312,7 +312,7 @@ local function procatc(data)
             if string.find(data, "CONNECT") == 1 then
                 result = true
                 respdata = data
-            else 
+            else
                 isurc = true
             end
         else
@@ -359,8 +359,8 @@ local function getcmd(item)
         return
     end
     --命令前缀
-    local head = string.match(cmd, "AT([%+%*]*%u+)")
-    
+    local head = string.match(cmd, "AT([%+%*%^]*%u+)")
+
     if head == nil then
         log.error("ril.getcmd", "request error cmd:", cmd)
         return
@@ -372,7 +372,7 @@ local function getcmd(item)
             return
         end
     end
-    
+
     --赋值全局变量
     currcmd = cmd
     currarg = arg
@@ -381,7 +381,7 @@ local function getcmd(item)
     cmdhead = head
     cmdtype = RILCMD[head] or NORESULT
     rspformt = formtab[head]
-    
+
     return currcmd
 end
 
@@ -396,9 +396,9 @@ local function sendat()
     if not radioready or readat or currcmd ~= nil or delaying then
         return
     end
-    
+
     local item
-    
+
     while true do
         --队列无AT命令
         if #cmdqueue == 0 then
@@ -421,14 +421,14 @@ local function sendat()
             table.insert(cmdqueue, 1, item)
             return
         end
-        
+
         if currcmd ~= nil then
             break
         end
     end
     --启动AT命令应答超时定时器
     sys.timerStart(atimeout, TIMEOUT)
-    
+
     log.info("ril.sendat", currcmd)
     --向虚拟串口中发送AT命令
     vwrite(uart.ATC, currcmd .. "\r")
@@ -452,7 +452,7 @@ end
 ]]
 local function atcreader()
     local s
-    
+
     if not transparentmode then readat = true end
     --循环读取虚拟串口收到的数据
     while true do

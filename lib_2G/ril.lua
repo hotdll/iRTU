@@ -290,7 +290,7 @@ local function procatc(data)
             vwrite(uart.ATC, currarg, "\026")
         --发送数据
         elseif cmdhead == "+CIPSEND" or cmdhead == "+SSLSEND" or cmdhead == "+SSLCERT" then
-            log.info("ril.procatc.send", "first 200 bytes", currarg:sub(1,2000))
+            log.info("ril.procatc.send", "first 200 bytes", currarg:sub(1,200))
             vwrite(uart.ATC, currarg)
         else
             log.error("error promot cmd:", currcmd)

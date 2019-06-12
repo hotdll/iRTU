@@ -31,6 +31,19 @@ function setDnsIP(ip1, ip2)
     dnsIP = "\"" .. (ip1 or "") .. "\",\"" .. (ip2 or "") .. "\""
 end
 
+--- 设置带加密方式的专网APN(注意：在main.lua中，最早可以执行代码的位置调用此接口)
+-- @number[opt=0] prot，加密方式， 0:不加密  1:PAP  2:CHAP
+-- @string[opt=""] apn，apn名称
+-- @string[opt=""] user，apn用户名
+-- @string[opt=""] pwd，apn密码
+-- @return nil
+-- @usage
+-- c = link.setAuthApn(2,"MYAPN","MYNAME","MYPASSWORD")
+function setAuthApn(prot,apn,user,pwd)
+    request('AT*CGDFLT=1,"IP","'..(apn or '')..'",,,,,,,,,,,,,,,,,,1')
+    request('AT*CGDFAUTH=0,'..(prot or 0)..',"'..(user or '')..'","'..(pwd or '')..'"')
+end
+
 local function Pdp_Act()
     log.info(ready,net.getNetMode(), gprsAttached)
     if ready then 
@@ -243,7 +256,7 @@ local function cgevurc(data)
     if string.match(data, "DEACT") then
         ready = false
         sys.publish('IP_ERROR_IND')
-        
+        sys.publish('PDP_DEACT_IND')
         if net.getState() ~= 'REGISTERED' then return end
         sys.timerStart(Pdp_Act, 2000)
     end

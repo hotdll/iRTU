@@ -8,8 +8,8 @@ PRODUCT_KEY = "DPVrZXiffhEUBeHOUwOKTlESam3aXvnR"
 --加载日志功能模块，并且设置日志输出等级
 --如果关闭调用log模块接口输出的日志，等级设置为log.LOG_SILENT即可
 require "log"
-LOG_LEVEL = log.LOGLEVEL_INFO
--- LOG_LEVEL = log.LOGLEVEL_TRACE
+-- LOG_LEVEL = log.LOGLEVEL_INFO
+LOG_LEVEL = log.LOGLEVEL_TRACE
 require "sys"
 require "net"
 require "utils"

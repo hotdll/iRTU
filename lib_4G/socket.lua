@@ -113,6 +113,9 @@ function mt:connect(address, port, timeout)
         log.info("socket.connect: ip not ready")
         return false
     end
+    
+    self.address = address
+    self.port = port
     if self.protocol == 'TCP' then
         self.id = socketcore.sock_conn(0, address, port)
     elseif self.protocol == 'TCPSSL' then
@@ -145,7 +148,11 @@ function mt:connect(address, port, timeout)
     self.timerId = sys.timerStart(coroutine.resume, (timeout or 120) * 1000, self.co, false, "TIMEOUT")
     local result, reason = coroutine.yield()
     if self.timerId and reason ~= "TIMEOUT" then sys.timerStop(self.timerId) end
-    if not result then log.info("socket:connect: connect fail", reason) return false end
+    if not result then
+        log.info("socket:connect: connect fail", reason)
+        sys.publish("LIB_SOCKET_CONNECT_FAIL_IND",self.ssl,self.protocol,address,port)
+        return false
+    end
     log.info("socket:connect: connect ok")
     self.connected = true
     socketsConnected = self.connected or socketsConnected
@@ -178,6 +185,7 @@ function mt:asyncSelect(keepAlive, pingreq)
             if self.timerId and reason ~= "TIMEOUT" then sys.timerStop(self.timerId) end
             sys.publish("SOCKET_ASYNC_SEND", result)
             if not result then
+                sys.publish("LIB_SOCKET_SEND_FAIL_IND",self.ssl,self.protocol,self.address,self.port)
                 return false
             end
         end
@@ -243,7 +251,11 @@ function mt:send(data, timeout)
         self.timerId = sys.timerStart(coroutine.resume, (timeout or 120) * 1000, self.co, false, "TIMEOUT")
         local result, reason = coroutine.yield()
         if self.timerId and reason ~= "TIMEOUT" then sys.timerStop(self.timerId) end
-        if not result then log.info("socket:send", "send fail", reason) return false end
+        if not result then
+            log.info("socket:send", "send fail", reason)
+            sys.publish("LIB_SOCKET_SEND_FAIL_IND",self.ssl,self.protocol,self.address,self.port)
+            return false
+        end
     end
     return true
 end

@@ -492,7 +492,7 @@ local function rsp(cmd, success, response, intermediate)
 				publish("GSM_SIGNAL_REPORT_IND", success, rssi)
 			end
 		elseif prefix == "+CFUN" then
-			publish("FLYMODE", flyMode)
+			if success then publish("FLYMODE", flyMode) end
 		elseif prefix == "+CENG" then end
 	end
 end

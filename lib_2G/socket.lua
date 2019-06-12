@@ -513,8 +513,22 @@ local function onResponse(cmd, success, response, intermediate)
             -- CIPSTART,SSLCONNECT 返回OK只是表示被接受
             return
         end
-        if (prefix == '+CIPSEND' or prefix == "+SSLSEND") and response:match("%d, *([%u%d :]+)") ~= 'SEND OK' then
-            success = false
+        
+        if prefix=='+CIPSEND' then
+            if response:match("%d, *([%u%d :]+)")~='SEND OK' then
+                local acceptLen = response:match("DATA ACCEPT:%d,(%d+)")
+                if acceptLen then
+                    if acceptLen~=cmd:match("AT%+%u+=%d,(%d+)") then
+                        success = false
+                    end
+                else
+                    success = false
+                end
+            end
+        elseif prefix=="+SSLSEND" then
+            if response:match("%d, *([%u%d :]+)")~='SEND OK' then
+                success = false
+            end
         end
         
         local reason, address
@@ -622,6 +636,18 @@ end
 -- @usage socket.setDnsParser(parserFnc)
 function setDnsParser(parserFnc)
     dnsParser = parserFnc
+end
+
+--- 设置数据发送模式（在网络准备就绪之前调用此接口设置）.
+-- 如果设置为快发模式，注意如下两点：
+-- 1、通过send接口发送的数据，如果成功发送到服务器，设备端无法获取到这个成功状态
+-- 2、通过send接口发送的数据，如果发送失败，设备端可以获取到这个失败状态
+-- 慢发模式可以获取到send接口发送的成功或者失败
+-- @number[opt=0] mode，数据发送模式，0表示慢发，1表示快发
+-- @return nil
+-- @usage socket.setSendMode(1)
+function setSendMode(mode)
+    link.setSendMode(mode)
 end
 
 setTcpResendPara(4, 16)

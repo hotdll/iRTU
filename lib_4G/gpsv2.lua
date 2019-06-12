@@ -224,7 +224,7 @@ function open(id, baudrate, mode, sleepTm, fnc)
     sleepTm = tonumber(sleepTm) and sleepTm * 1000 or 5000
     pm.wake("gpsv2.lua")
     uartID, uartBaudrate = tonumber(id) or uartID, tonumber(baudrate) or uartBaudrate
-    -- log.info("GPS-UARTR-ID and buad:", id, baudrate, uartID, uartBaudrate)
+    log.info("GPS-UARTR-ID and buad:", id, baudrate, uartID, uartBaudrate)
     uart.close(uartID)
     uart.setup(uartID, uartBaudrate, 8, uart.PAR_NONE, uart.STOP_1)
     if fnc and type(fnc) == "function" then
@@ -447,10 +447,12 @@ function getDeglbs()
 end
 
 --- 获取度格式的经纬度信息dd.dddddd
--- @return string,string,返回度格式的字符串经度,维度,符号(正东负西,正北负南)
+-- @return string,string,固件为非浮点时返回度格式的字符串经度,维度,符号(正东负西,正北负南)
+-- @return float,float,固件为浮点的时候，返回浮点类型
 -- @usage gpsv2.getLocation()
 function getDegLocation()
     local lng, lat = getIntLocation()
+    if float then return lng / 10 ^ 7, lat / 10 ^ 7 end
     return string.format("%d.%07d", lng / 10 ^ 7, lng % 10 ^ 7), string.format("%d.%07d", lat / 10 ^ 7, lat % 10 ^ 7)
 end
 

@@ -99,7 +99,7 @@ function clientDataTask(host,tPorts,clientId,user,password)
     local retryConnectCnt = 0
     local portIdx = 0
     while true do
-        if isSleep then sys.wait("ALITUN_WAKEUP") end
+        if isSleep then sys.waitUntil("ALITUN_WAKEUP") end
 
         if not socket.isReady() then
             retryConnectCnt = 0

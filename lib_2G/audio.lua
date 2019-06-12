@@ -35,6 +35,7 @@ local function update(priority,type,path,vol,cb,dup,dupInterval)
             --此处第三个参数传入table是因为publish接口无法处理nil后面的参数
             sys.publish("AUDIO_PLAY_END","NEW",{pri=priority,typ=type,pth=path,vl=vol,c=cb,dp=dup,dpIntval=dupInterval})
         else
+            log.error("audio.update","priority error")
             return false
         end
     else
@@ -232,7 +233,10 @@ end
 -- @usage audio.play(0,"FILE","/ldata/call.mp3",7,cbFnc)
 -- @usage 更多用法参考demo/audio/testAudio.lua
 function play(priority,type,path,vol,cbFnc,dup,dupInterval)
-    if not update(priority,type,path,vol or 4,cbFnc,dup,dupInterval or 0) then return false end
+    if not update(priority,type,path,vol or 4,cbFnc,dup,dupInterval or 0) then
+        log.error("audio.play","sync error")
+        return false
+    end
     if not sType or not taskID or coroutine.status(taskID)=="dead" then
         taskID = sys.taskInit(taskAudio)
     end

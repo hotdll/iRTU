@@ -189,6 +189,7 @@ local function mqttTask(cid, pios, reg, convert, passon, upprot, dwprot, keepAli
     cid, keepAlive, timeout, uid = tonumber(cid) or 1, tonumber(keepAlive) or 300, tonumber(timeout), tonumber(uid)
     cleansession, qos, retain = tonumber(cleansession) or 0, tonumber(qos) or 0, tonumber(retain) or 0
     clientID = (clientID == "" or not clientID) and misc.getImei() or clientID
+    if timeout then sys.timerLoopStart(sys.publish, timeout * 1000, "AUTO_SAMPL_" .. uid) end
     if type(sub) == "string" then
         sub = listTopic(sub, addImei)
         local topics = {}
@@ -211,7 +212,7 @@ local function mqttTask(cid, pios, reg, convert, passon, upprot, dwprot, keepAli
             if loginMsg(reg) then mqttc:publish(pub[1], loginMsg(reg), tonumber(pub[2]) or qos, retain) end
             while true do
                 datalink = true
-                local r, packet, param = mqttc:receive(timeout * 1000 or 1800000, "NET_SENT_RDY_" .. (passon and cid or uid))
+                local r, packet, param = mqttc:receive((timeout or 180) * 1000, "NET_SENT_RDY_" .. (passon and cid or uid))
                 if r then
                     log.info("订阅的消息:", packet and packet.topic)
                     messageId = packet.topic:match(".+/rrpc/request/(%d+)")
@@ -231,7 +232,7 @@ local function mqttTask(cid, pios, reg, convert, passon, upprot, dwprot, keepAli
                         sys.publish("UART_SENT_RDY_" .. uid, uid, packet.payload)
                     end
                 elseif packet == 'timeout' then
-                    sys.publish("AUTO_SAMPL_" .. uid)
+                    -- sys.publish("AUTO_SAMPL_" .. uid)
                     log.debug('The client timeout actively reports status information.')
                 elseif packet == ("NET_SENT_RDY_" .. (passon and cid or uid)) then
                     if convert == 1 then -- 转换为Hex String 报文
@@ -332,6 +333,7 @@ end
 local function oneNet_mqtt(cid, pios, reg, convert, passon, upprot, dwprot, keepAlive, timeout, addr, port, regcode, pid, ptype, cleansession, qos, retain, uid)
     cid, keepAlive, timeout, uid = tonumber(cid) or 1, tonumber(keepAlive) or 300, tonumber(timeout), tonumber(uid)
     cleansession, qos, retain, ptype = tonumber(cleansession) or 0, tonumber(qos) or 0, tonumber(retain) or 0, tonumber(ptype) or 3
+    if timeout then sys.timerLoopStart(sys.publish, timeout * 1000, "AUTO_SAMPL_" .. uid) end
     local dat = regOneNet(regcode, uid)
     local dwprotFnc = dwprot and dwprot[cid] and dwprot[cid] ~= "" and loadstring(dwprot[cid]:match("function(.+)end"))
     local upprotFnc = upprot and upprot[cid] and upprot[cid] ~= "" and loadstring(upprot[cid]:match("function(.+)end"))
@@ -343,7 +345,7 @@ local function oneNet_mqtt(cid, pios, reg, convert, passon, upprot, dwprot, keep
         if mqttc:subscribe("$creq/#", qos) then
             while true do
                 datalink = true
-                local r, packet, param = mqttc:receive(timeout * 1000 or 1800000, "NET_SENT_RDY_" .. (passon and cid or uid))
+                local r, packet, param = mqttc:receive((timeout or 180) * 1000, "NET_SENT_RDY_" .. (passon and cid or uid))
                 -- log.info("MQTT 订阅的消息:", convert, packet.payload)
                 if r then
                     rsp = packet.topic:match("$creq/(%g+)")
@@ -367,7 +369,7 @@ local function oneNet_mqtt(cid, pios, reg, convert, passon, upprot, dwprot, keep
                         end
                     end
                 elseif packet == 'timeout' then
-                    sys.publish("AUTO_SAMPL_" .. uid)
+                    -- sys.publish("AUTO_SAMPL_" .. uid)
                     log.debug('The client timeout actively reports status information.')
                 elseif packet == ("NET_SENT_RDY_" .. (passon and cid or uid)) then
                     if convert == 1 then -- 转换为Hex String 报文
@@ -432,9 +434,7 @@ end
 local function registerDevice(RegionId, ProductKey, AccessKeyId, AccessKeySecret)
     if io.exists(alikey) then
         local dat, res, err = json.decode(io.readFile(alikey))
-        if res then
-            return dat.Data.DeviceName, dat.Data.DeviceSecret
-        end
+        if res then return dat.Data.DeviceName, dat.Data.DeviceSecret end
     end
     local param = aliCommonParam("RegisterDevice", RegionId, ProductKey, AccessKeyId, AccessKeySecret)
     for i = 1, 3 do
@@ -450,6 +450,7 @@ local function registerDevice(RegionId, ProductKey, AccessKeyId, AccessKeySecret
                 end
             end
         end
+        log.warn("阿里云注册请求失败:", code, body)
         sys.wait(5000)
     end
     param = aliCommonParam("QueryDeviceDetail", RegionId, ProductKey, AccessKeyId, AccessKeySecret)
@@ -485,6 +486,7 @@ local function getOneSecret(RegionId, ProductKey, ProductSecret)
                 return dat.data.deviceName, dat.data.deviceSecret
             end
         end
+        log.warn("阿里云查询请求失败:", code, body)
         sys.wait(5000)
     end
 end
