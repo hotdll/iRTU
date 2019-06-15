@@ -306,7 +306,7 @@ cmd.config = {
         local tmp = "1200,2400,4800,9600,14400,19200,28800,38400,57600,115200,230400,460800,921600"
         if t[1] and t[2] and t[3] and t[4] and t[5] then
             if ("1,2"):find(t[1]) and tmp:find(t[2]) and ("7,8"):find(t[3]) and ("0,1,2"):find(t[4]) and ("0,2"):find(t[5]) then
-                dtu.uconf[t[1]] = t
+                dtu.uconf[tonumber(t[1])] = t
                 return "OK"
             else
                 return "ERROR"
