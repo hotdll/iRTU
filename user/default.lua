@@ -15,7 +15,7 @@ require "mqtt"
 require "utils"
 require "lbsLoc"
 require "socket"
-require "update"
+require "audio"
 require "httpv2"
 require "gpsv2"
 require "common"
@@ -25,6 +25,7 @@ module(..., package.seeall)
 
 -- 判断模块类型
 local is4gLod = rtos.get_version():upper():find("ASR1802")
+local isTTS = rtos.get_version():upper():find("TTS")
 -- 用户的配置参数
 local CONFIG = "/CONFIG.cnf"
 -- 串口缓冲区最大值
@@ -379,7 +380,13 @@ cmd.rrpc = {
     ["gps_getsta"] = function(t) return "rrpc,gps_getsta," .. tracker.deviceMessage(t[1] or "json") end,
     ["gps_getmsg"] = function(t) return "rrpc,gps_getmsg," .. tracker.locateMessage(t[1] or "json") end,
     ["upconfig"] = function(t)sys.publish("UPDATE_DTU_CNF") return "rrpc,upconfig,OK" end,
-    ["function"] = function(t)log.info("rrpc,function:", table.concat(t, ",")) return "rrpc,function," .. (loadstring(table.concat(t, ","))() or "OK") end
+    ["function"] = function(t)log.info("rrpc,function:", table.concat(t, ",")) return "rrpc,function," .. (loadstring(table.concat(t, ","))() or "OK") end,
+    ["tts_play"] = function(t)
+        if not isTTS then return "rrpc,tts_play,not_tts_lod" end
+        local str = string.upper(t[1]) == "GB2312" and common.gb2312ToUtf8(t[2]) or t[2]
+        audio.play(1, "TTS", str, tonumber(t[3]) or 7, nil, false, 0)
+        return "rrpc,tts_play,OK"
+    end
 }
 
 -- 串口读指令
