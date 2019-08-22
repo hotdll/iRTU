@@ -45,9 +45,9 @@ function setAuthApn(prot,apn,user,pwd)
 end
 
 local function Pdp_Act()
-    log.info(ready,net.getNetMode(), gprsAttached)
+    log.info("link.Pdp_Act",ready,net.getNetMode(), gprsAttached)
     if ready then 
-        request("AT+CGDCONT?", nil, pdpCmdCnf)
+        request("AT+CGDCONT?")
         return 
     end
     if net.getNetMode() == net.NetMode_LTE then
@@ -58,7 +58,7 @@ local function Pdp_Act()
         if not apnname then
             sys.timerStart(pdpCmdCnf, 1000, "SET_PDP_4G_WAITAPN",true)
         else
-            request("AT+CGDCONT?", nil, pdpCmdCnf)
+            request("AT+CGDCONT?")
             --request(string.format('AT*CGDFLT=0,"IP","%s"', apnname), nil, pdpCmdCnf)
         end
     else
@@ -176,7 +176,7 @@ function pdpCmdCnf(curCmd, result,respdata, interdata)
             ready = true
             publish("IP_READY_IND")
         elseif string.find(curCmd, "CGACT=") then
-            request("AT+CGDCONT?", nil, pdpCmdCnf)
+            request("AT+CGDCONT?")
 		elseif string.find(curCmd, "CGACT%?") then
 			if IsExistActivedCid(interdata) then
 				sys.timerStart(pdpCmdCnf, 100, "CONNECT_DELAY",true)
@@ -184,19 +184,19 @@ function pdpCmdCnf(curCmd, result,respdata, interdata)
 				request(string.format('AT+CGDCONT=%d,"IP","%s"', cid_manual,apnname), nil, pdpCmdCnf)
 			end
         elseif string.find(curCmd, "CGDFLT") then
-            request("AT+CGDCONT?", nil, pdpCmdCnf)
+            request("AT+CGDCONT?")
         elseif string.find(curCmd,"SET_PDP_4G_WAITAPN") then
             if not apnname then
                 sys.timerStart(pdpCmdCnf, 100, "SET_PDP_4G_WAITAPN",true)
             else
-			    request("AT+CGDCONT?", nil, pdpCmdCnf,1000)
+			    request("AT+CGDCONT?", nil, nil,1000)
            --   request(string.format('AT*CGDFLT=0,"IP","%s"', apnname), nil, pdpCmdCnf)
             end
         end
     else
         if net.getState() ~= 'REGISTERED' then return end
         if net.getNetMode() == net.NetMode_LTE then
-            request("AT+CGDCONT?", nil, pdpCmdCnf,1000)
+            request("AT+CGDCONT?", nil, nil,1000)
         else
             request("AT+CGATT?", nil, nil, 1000)
         end        
@@ -264,3 +264,4 @@ end
 
 request("AT+CIND=1", nil, cindCnf)
 ril.regUrc("+CGEV", cgevurc)
+ril.regUrc("+CGDCONT", function(data) pdpCmdCnf("AT+CGDCONT?", true, "OK", data) end)

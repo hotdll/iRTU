@@ -14,6 +14,7 @@ module(..., package.seeall)
 
 local sProductKey,sProductSecret,sGetDeviceNameFnc,sGetDeviceSecretFnc,sSetDeviceSecretFnc
 local sKeepAlive,sCleanSession,sWill
+local sErrHandleCo,sErrHandleCb,sErrHandleTmout
 
 local outQueue =
 {
@@ -107,6 +108,7 @@ function clientDataTask(host,tPorts,clientId,user,password)
                             if not result then log.warn("aLiYun.clientDataTask."..prompt.." error") break end
                         end
                         if not result then break end
+                        if sErrHandleCo then coroutine.resume(sErrHandleCo,"feed") end
                     end
                 else
                     log.warn("aLiYun.clientDataTask."..prompt.." error")
@@ -288,4 +290,18 @@ end
 -- aLiYun.on("b0FMK1Ga5cp",nil,getDeviceNameFnc,getDeviceSecretFnc)
 function on(evt,cbFnc)
 	evtCb[evt] = cbFnc
+end
+
+function setErrHandle(cbFnc,tmout)
+    sErrHandleCb = cbFnc
+    sErrHandleTmout = tmout or 150
+    if not sErrHandleCo then
+        sErrHandleCo = sys.taskInit(function()
+            while true do
+                if sys.wait(sErrHandleTmout*1000) == nil then
+                    sErrHandleCb()
+                end
+            end
+        end)
+    end
 end

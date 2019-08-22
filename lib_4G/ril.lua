@@ -54,7 +54,7 @@ local RILCMD = {
     ["+CTFSAUTH"] = 2,
     ["+CGDATA"] = 10,
     ["+CIND"] = 2,
-    ["+CGDCONT"] = 3,
+    --["+CGDCONT"] = 3,
 	["+CGACT"] = 3,
 }
 

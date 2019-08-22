@@ -1,4 +1,5 @@
---- 模块功能：远程升级
+--- 模块功能：远程升级.
+-- 参考 http://ask.openluat.com/article/916 加深对远程升级功能的理解
 -- @module update
 -- @author openLuat
 -- @license MIT
@@ -62,7 +63,7 @@ function clientTask()
             local _,result,statusCode,head = sys.waitUntil("UPDATE_DOWNLOAD")
             log.info("update.waitUntil UPDATE_DOWNLOAD",result,statusCode)
             if result then
-                rtos.fota_end()
+                log.info("update.rtos.fota_end",rtos.fota_end())
                 if statusCode=="200" or statusCode=="206" then                    
                     if sCbFnc then
                         sCbFnc(true)

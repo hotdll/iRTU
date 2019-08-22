@@ -68,6 +68,8 @@ local function socket(protocol, cert)
         connected = false,
         iSubscribe = false,
         subMessage = nil,
+        isBlock = false,
+        msg = nil,
     }
     return setmetatable(o, mt)
 end
@@ -150,7 +152,7 @@ function mt:connect(address, port, timeout)
     if self.timerId and reason ~= "TIMEOUT" then sys.timerStop(self.timerId) end
     if not result then
         log.info("socket:connect: connect fail", reason)
-        sys.publish("LIB_SOCKET_CONNECT_FAIL_IND",self.ssl,self.protocol,address,port)
+        sys.publish("LIB_SOCKET_CONNECT_FAIL_IND", self.ssl, self.protocol, address, port)
         return false
     end
     log.info("socket:connect: connect ok")
@@ -185,7 +187,7 @@ function mt:asyncSelect(keepAlive, pingreq)
             if self.timerId and reason ~= "TIMEOUT" then sys.timerStop(self.timerId) end
             sys.publish("SOCKET_ASYNC_SEND", result)
             if not result then
-                sys.publish("LIB_SOCKET_SEND_FAIL_IND",self.ssl,self.protocol,self.address,self.port)
+                sys.publish("LIB_SOCKET_SEND_FAIL_IND", self.ssl, self.protocol, self.address, self.port)
                 return false
             end
         end
@@ -238,7 +240,7 @@ end
 -- @return result true - 成功，false - 失败
 -- @usage  c = socket.tcp(); c:connect(); c:send("12345678");
 function mt:send(data, timeout)
-    assert(self.co == coroutine.running(), "socket:recv: coroutine mismatch")
+    assert(self.co == coroutine.running(), "socket:send: coroutine mismatch")
     if self.error then
         log.warn('socket.client:send', 'error', self.error)
         return false
@@ -253,7 +255,7 @@ function mt:send(data, timeout)
         if self.timerId and reason ~= "TIMEOUT" then sys.timerStop(self.timerId) end
         if not result then
             log.info("socket:send", "send fail", reason)
-            sys.publish("LIB_SOCKET_SEND_FAIL_IND",self.ssl,self.protocol,self.address,self.port)
+            sys.publish("LIB_SOCKET_SEND_FAIL_IND", self.ssl, self.protocol, self.address, self.port)
             return false
         end
     end
@@ -311,8 +313,10 @@ function mt:recv(timeout, msg)
     if self.protocol == "UDP" then
         return true, table.remove(self.input)
     else
+        log.warn("-------------------使用缓冲区---------------")
         local s = table.concat(self.input)
         self.input = {}
+        if self.isBlock then table.insert(self.input, socketcore.sock_recv(self.msg.socket_index, self.msg.recv_len)) end
         return true, s
     end
 end
@@ -394,30 +398,23 @@ rtos.on(rtos.MSG_SOCK_RECV_IND, function(msg)
         return
     end
     
-    local s = socketcore.sock_recv(msg.socket_index, msg.recv_len)
-    log.debug("socket.recv", "total " .. msg.recv_len .. " bytes", "first " .. 30 .. " bytes", s:sub(1, 30))
+    -- local s = socketcore.sock_recv(msg.socket_index, msg.recv_len)
+    -- log.debug("socket.recv", "total " .. msg.recv_len .. " bytes", "first " .. 30 .. " bytes", s:sub(1, 30))
     if sockets[msg.socket_index].wait == "+RECEIVE" then
-        coroutine.resume(sockets[msg.socket_index].co, true, s)
+        coroutine.resume(sockets[msg.socket_index].co, true, socketcore.sock_recv(msg.socket_index, msg.recv_len))
     else -- 数据进缓冲区，缓冲区溢出采用覆盖模式
         if #sockets[msg.socket_index].input > INDEX_MAX then
-            log.error("socket recv", "out of stack")
-            sockets[msg.socket_index].input = {}
+            log.error("socket recv", "out of stack", "block")
+            -- sockets[msg.socket_index].input = {}
+            sockets[msg.socket_index].isBlock = true
+            sockets[msg.socket_index].msg = msg
+        else
+            sockets[msg.socket_index].isBlock = false
+            table.insert(sockets[msg.socket_index].input, socketcore.sock_recv(msg.socket_index, msg.recv_len))
         end
-        table.insert(sockets[msg.socket_index].input, s)
         sys.publish("SOCKET_RECV", msg.socket_index)
     end
 end)
-
---- 打印所有socket的状态
--- @return 无
--- @usage socket.printStatus()
-function printStatus()
-    for _, client in pairs(sockets) do
-        for k, v in pairs(client) do
-            log.info('socket.printStatus', 'client', client.id, k, v)
-        end
-    end
-end
 
 --- 设置TCP层自动重传的参数
 -- @number[opt=4] retryCnt，重传次数；取值范围0到12
@@ -431,3 +428,13 @@ function setTcpResendPara(retryCnt, retryMaxTimeout)
 end
 
 -- setTcpResendPara(1, 16)
+--- 打印所有socket的状态
+-- @return 无
+-- @usage socket.printStatus()
+function printStatus()
+    for _, client in pairs(sockets) do
+        for k, v in pairs(client) do
+            log.info('socket.printStatus', 'client', client.id, k, v)
+        end
+    end
+end

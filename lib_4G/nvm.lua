@@ -4,30 +4,29 @@
 -- @license MIT
 -- @copyright openLuat
 -- @release 2017.11.9
+require "log"
 
-require"log"
+module(..., package.seeall)
 
-module(...,package.seeall)
-
---默认参数配置存储在configname文件中
 --实时参数配置存储在paraname文件中
+--默认参数配置存储在configname文件中
 --para：实时参数表
 --config：默认参数表
-paraname,paranamebak = "/nvm_para.lua","/nvm_para_bak.lua"
-local para,libdftconfig,configname,econfigname = {}
+paraname, paranamebak = "/nvm_para.lua", "/nvm_para_bak.lua"
+local para, libdftconfig, configname, econfigname = {}
 
 --[[
 函数名：serialize
 功能  ：根据不同的数据类型，按照不同的格式，写格式化后的数据到文件中
 参数  ：
-        pout：文件句柄
-        o：数据
+pout：文件句柄
+o：数据
 返回值：无
 ]]
-local function serialize(pout,o)
+local function serialize(pout, o)
     if type(o) == "number" then
         --number类型，直接写原始数据
-        pout:write(o)    
+        pout:write(o)
     elseif type(o) == "string" then
         --string类型，原始数据左右各加上双引号写入
         pout:write(string.format("%q", o))
@@ -37,15 +36,18 @@ local function serialize(pout,o)
     elseif type(o) == "table" then
         --table类型，加换行，大括号，中括号，双引号写入
         pout:write("{\n")
-        for k,v in pairs(o) do
-            if type(k) == "number" then
-                pout:write(" [" .. k .. "] = ")
-            elseif type(k) == "string" then
-                pout:write(" [\"" .. k .."\"] = ")
-            else
-                error("cannot serialize table key " .. type(o))
-            end
-            serialize(pout,v)
+        for k, v in pairs(o) do
+            -- if type(k) == "number" then
+            --     pout:write(" [" .. k .. "] = ")
+            -- elseif type(k) == "string" then
+            --     pout:write(" [\"" .. k .."\"] = ")
+            -- else
+            --     error("cannot serialize table key " .. type(o))
+            -- end
+            pout:write(" [")
+            serialize(pout, k)
+            pout:write("] = ")
+            serialize(pout, v)
             pout:write(",\n")
         end
         pout:write("}\n")
@@ -58,25 +60,25 @@ end
 函数名：upd
 功能  ：更新实时参数表
 参数  ：
-        overide：是否用默认参数强制更新实时参数
+overide：是否用默认参数强制更新实时参数
 返回值：无
 ]]
 function upd(overide)
-    for k,v in pairs(libdftconfig) do
+    for k, v in pairs(libdftconfig) do
         if k ~= "_M" and k ~= "_NAME" and k ~= "_PACKAGE" then
             if overide or para[k] == nil then
                 para[k] = v
-            end            
+            end
         end
     end
 end
 
 local function safePcall(file)
     local oldPath = package.path
-    package.path = "/?.lua;".."/?.luae;"..package.path    
-    local result,para = pcall(require,file)
+    package.path = "/?.lua;" .. "/?.luae;" .. package.path
+    local result, para = pcall(require, file)
     package.path = oldPath
-    return result,para
+    return result, para
 end
 
 --[[
@@ -86,40 +88,40 @@ end
 返回值：无
 ]]
 local function load()
-    local f,fBak,fExist,fBakExist
-    f = io.open(paraname,"rb")
-    fBak = io.open(paranamebak,"rb")
-	
+    local f, fBak, fExist, fBakExist
+    f = io.open(paraname, "rb")
+    fBak = io.open(paranamebak, "rb")
+    
     if f then
-        fExist = f:read("*a")~=""
+        fExist = f:read("*a") ~= ""
         f:close()
     end
     if fBak then
-        fBakExist = fBak:read("*a")~=""
+        fBakExist = fBak:read("*a") ~= ""
         fBak:close()
     end
-	
-    print("load fExist fBakExist",fExist,fBakExist)
-	
-    local fResult,fBakResult
+    
+    print("load fExist fBakExist", fExist, fBakExist)
+    
+    local fResult, fBakResult
     if fExist then
-        fResult,para = safePcall(paraname:match("/(.+)%.lua"))
+        fResult, para = safePcall(paraname:match("/(.+)%.lua"))
     end
-	
-    print("load fResult",fResult)
-	
+    
+    print("load fResult", fResult)
+    
     if fResult then
         os.remove(paranamebak)
         upd()
         return
     end
-	
+    
     if fBakExist then
-        fBakResult,para = safePcall(paranamebak:match("/(.+)%.lua"))
+        fBakResult, para = safePcall(paranamebak:match("/(.+)%.lua"))
     end
-	
-    print("load fBakResult",fBakResult)
-	
+    
+    print("load fBakResult", fBakResult)
+    
     if fBakResult then
         os.remove(paraname)
         upd()
@@ -134,31 +136,31 @@ end
 函数名：save
 功能  ：保存参数文件
 参数  ：
-        s：是否真正保存，true保存，false或者nil不保存
+s：是否真正保存，true保存，false或者nil不保存
 返回值：无
 ]]
 local function save(s)
     if not s then return end
     local f = {}
-    f.write = function(self, s) table.insert(self, s) end
-
+    f.write = function(self, s)table.insert(self, s) end
+    
     f:write("module(...)\n")
-
-    for k,v in pairs(para) do
+    
+    for k, v in pairs(para) do
         if k ~= "_M" and k ~= "_NAME" and k ~= "_PACKAGE" then
             f:write(k .. " = ")
-            serialize(f,v)
+            serialize(f, v)
             f:write("\n")
         end
     end
-
-
+    
+    
     local fparabak = io.open(paranamebak, 'wb')
     fparabak:write(table.concat(f))
     fparabak:close()
-	
-    os.remove(paraname)	
-    os.rename(paranamebak,paraname)
+    
+    os.remove(paraname)
+    os.rename(paranamebak, paraname)
 end
 
 --- 初始化参数存储模块
@@ -167,8 +169,8 @@ end
 -- @usage nvm.init("config.lua")
 function init(defaultCfgFile)
     local f
-    f,libdftconfig = safePcall(defaultCfgFile:match("(.+)%.lua"))
-    configname,econfigname = "/lua/"..defaultCfgFile,"/lua/"..defaultCfgFile.."e"
+    f, libdftconfig = safePcall(defaultCfgFile:match("(.+)%.lua"))
+    configname, econfigname = "/lua/" .. defaultCfgFile, "/lua/" .. defaultCfgFile .. "e"
     --初始化配置文件，从文件中把参数读取到内存中
     load()
 end
@@ -183,16 +185,16 @@ end
 -- @usage nvm.set("age",12,"SVR")，参数age赋值为12，立即写入文件系统，如果旧值不是12，会产生一个PARA_CHANGED_IND消息，携带 "age",12,"SVR" 3个参数
 -- @usage nvm.set("class","Class2",nil,false)，参数class赋值为Class2，不写入文件系统
 -- @usage nvm.set("score",{chinese=100,math=99,english=98})，参数score赋值为{chinese=100,math=99,english=98}，立即写入文件系统
-function set(k,v,r,s)
+function set(k, v, r, s)
     local bchg = true
     if type(v) ~= "table" then
         bchg = (para[k] ~= v)
     end
-    log.info("nvm.set",bchg,k,v,r,s)
-    if bchg then        
+    log.info("nvm.set", bchg, k, v, r, s)
+    if bchg then
         para[k] = v
-        save(s or s==nil)
-        if r then sys.publish("PARA_CHANGED_IND",k,v,r) end
+        save(s or s == nil)
+        if r then sys.publish("PARA_CHANGED_IND", k, v, r) end
     end
     return true
 end
@@ -208,15 +210,15 @@ end
 -- @usage nvm.sett("score","chinese",100,"SVR")，参数score["chinese"]赋值为100，立即写入文件系统，
 -- 如果旧值不是100，会产生一个TPARA_CHANGED_IND消息，携带 "score","chinese",100,"SVR" 4个参数
 -- @usage nvm.sett("score","chinese",100,nil,false)，参数class赋值为Class2，不写入文件系统
-function sett(k,kk,v,r,s)
+function sett(k, kk, v, r, s)
     local bchg = true
     if type(v) ~= "table" then
         bchg = (para[k][kk] ~= v)
     end
     if bchg then
         para[k][kk] = v
-        save(s or s==nil)
-        if r then sys.publish("TPARA_CHANGED_IND",k,kk,v,r) end
+        save(s or s == nil)
+        if r then sys.publish("TPARA_CHANGED_IND", k, kk, v, r) end
     end
     return true
 end
@@ -240,7 +242,7 @@ end
 -- @string k table类型的参数名
 -- @param kk table类型参数的某一个索引名
 -- @usage nvm.gett("score","chinese")
-function gett(k,kk)
+function gett(k, kk)
     return para[k][kk]
 end
 
@@ -250,8 +252,8 @@ end
 function restore()
     os.remove(paraname)
     os.remove(paranamebak)
-    local fpara,fconfig = io.open(paraname,"wb"),io.open(configname,"rb")
-    if not fconfig then fconfig = io.open(econfigname,"rb") end
+    local fpara, fconfig = io.open(paraname, "wb"), io.open(configname, "rb")
+    if not fconfig then fconfig = io.open(econfigname, "rb") end
     fpara:write(fconfig:read("*a"))
     fpara:close()
     fconfig:close()

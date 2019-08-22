@@ -53,13 +53,10 @@ local cellinfo, multicellcb = {}
 local function creg(data)
     local p1, s
     local prefix = (netMode == NetMode_LTE) and "+CEREG: " or (netMode == NetMode_noNet and "+CREG: " or "+CGREG: ")
-
-    if netMode == NetMode_LTE then--4G 根据CEREG判断网络注册状态
-        if not data:match("+CEREG") then return end        
-    elseif netMode == NetMode_noNet then--无网络 根据CREG判断网络注册状态
-        if not data:match("+CREG") then return end        
-    else--2/3/2.5G 根据CGREG判断网络注册状态
-        if not data:match("+CGREG") then return end        
+    log.info("net.creg",netMode,prefix)
+    if not data:match(prefix) then
+        log.warn("net.creg","no match",data)
+        return
     end
     --获取注册状态
     _, _, p1 = data:find(prefix .. "%d,(%d+)")
@@ -135,7 +132,7 @@ local function eemLteSvc(data)
 			mnc = svcDataT[3]
 			lac = svcDataT[4]
 			ci = svcDataT[10]
-			rssi = (svcDataT[15])/3
+			rssi = (svcDataT[15]-(svcDataT[15]%3))/3
 			if rssi >31
 				then rssi = 31
 			end
@@ -573,6 +570,28 @@ function stopQueryAll()
     sys.timerStopAll(cengQueryPoll)
 end
 
+local sEngMode
+--- 设置工程模式
+-- @number[opt=1] mode，工程模式，目前仅支持0和1
+-- mode为0时，不支持临近小区查询，休眠时功耗较低
+-- mode为1时，支持临近小区查询，但是休眠时功耗较高
+-- @return nil
+-- @usage
+-- net.setEngMode(0)
+function setEngMode(mode)
+    sEngMode = mode or 1
+    ril.request("AT+EEMOPT="..sEngMode,nil,function(cmd,success)
+            function retrySetEngMode()
+                setEngMode(sEngMode)
+            end
+            if success then
+                sys.timerStop(retrySetEngMode)
+            else
+                sys.timerStart(retrySetEngMode,3000)
+            end
+        end)
+end
+
 -- 处理SIM卡状态消息，SIM卡工作不正常时更新网络状态为未注册
 sys.subscribe("SIM_IND", function(para)
 	log.info("SIM.subscribe", simerrsta, para)
@@ -612,6 +631,6 @@ ril.request("AT+CEREG=2")
 ril.request("AT+CREG?")
 ril.request("AT+CGREG?")
 ril.request("AT+CEREG?")
-ril.request("AT+EEMOPT=1")
+setEngMode(1)
 --重置当前小区和临近小区信息表
 resetCellInfo()
