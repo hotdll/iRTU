@@ -25,7 +25,7 @@ module(..., package.seeall)
 
 -- 判断模块类型
 local is4gLod = rtos.get_version():upper():find("ASR1802")
-local isTTS = rtos.get_version():upper():find("TTS")
+local isTTS = rtos.get_version():upper():find("TTS") or rtos.get_version():upper():find("8955F")
 -- 用户的配置参数
 local CONFIG = "/CONFIG.cnf"
 -- 串口缓冲区最大值
