@@ -851,19 +851,16 @@ function connect(pios, conf, reg, convert, passon, upprot, dwprot)
     -- 守护进程
     while true do
         -- 这里是网络正常,但是链接服务器失败重启
-        if datalink then
-            sys.timerStart(sys.restart, rstTim, "Server connection failed")
-            sys.timerStart(function()
-                net.switchFly(true)
-                sys.timerStart(net.switchFly, 5000, false)
-            end, flyTim)
-        end
+        if datalink then sys.timerStart(sys.restart, rstTim, "Server connection failed") end
         sys.wait(1000)
     end
 end
 net.switchFly(false)
 -- NTP同步失败强制重启
-local tid = sys.timerStart(sys.restart, rstTim, "同步时间失败,可能是GSM无法附着!")
+local tid = sys.timerStart(function()
+    net.switchFly(true)
+    sys.timerStart(net.switchFly, 5000, false)
+end, flyTim)
 sys.subscribe("NTP_SUCCEED", function()
     log.info("---------------------- 网络注册已成功 ----------------------")
     sys.timerStop(tid)
