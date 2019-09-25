@@ -530,7 +530,7 @@ sys.taskInit(function()
     local rst, code, head, body, url = false
     while true do
         rst = false
-        if not socket.isReady() and not sys.waitUntil("IP_READY_IND", 300000) then sys.restart("Network initialization failed!") end
+        if not socket.isReady() and not sys.waitUntil("IP_READY_IND", 600000) then sys.restart("Network initialization failed!") end
         if dtu.host and dtu.host ~= "" then
             local param = {product_name = _G.PROJECT, param_ver = dtu.param_ver, imei = misc.getImei()}
             code, head, body = httpv2.request("GET", dtu.host, 30000, param, nil, 1)
