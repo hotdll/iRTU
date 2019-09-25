@@ -20,12 +20,15 @@ require "common"
 require "tracker"
 module(..., package.seeall)
 ---------------------------------------------------------- 这个模块为2G和4G通用部分 ----------------------------------------------------------
-local softDog, datalink = 0, false
+local datalink = false
 -- 定时采集任务的参数
 local interval, samptime = {0, 0}, {0, 0}
 -- 获取经纬度
 local lat, lng = 0, 0
+-- 无网络重启时间，飞行模式启动时间
+local rstTim, flyTim = 600000, 300000
 
+-- 保存获取的基站坐标
 function setLocation(la, ln)
     lat, lng = la, ln
     log.info("基站定位请求的结果:", lat, lng)
@@ -112,7 +115,7 @@ local function tcpTask(cid, pios, reg, convert, passon, upprot, dwprot, prot, pi
     local upprotFnc = upprot and upprot[cid] and upprot[cid] ~= "" and loadstring(upprot[cid]:match("function(.+)end"))
     while true do
         local idx = 0
-        if not socket.isReady() and not sys.waitUntil("IP_READY_IND", 300000) then sys.restart("网络初始化失败!") end
+        if not socket.isReady() and not sys.waitUntil("IP_READY_IND", rstTim) then sys.restart("网络初始化失败!") end
         local c = prot == "TCP" and socket.tcp(ssl and ssl:lower() == "ssl") or socket.udp()
         while not c:connect(addr, port) do sys.wait((2 ^ idx) * 1000)idx = 2 ^ idx > 126320 and 0 or idx + 1 end
         -- 登陆报文
@@ -208,7 +211,7 @@ local function mqttTask(cid, pios, reg, convert, passon, upprot, dwprot, keepAli
     if not will or will == "" then will = nil else will = {qos = 1, retain = 0, topic = will, payload = misc.getImei()} end
     while true do
         local messageId, idx = false, 0
-        if not socket.isReady() and not sys.waitUntil("IP_READY_IND", 300000) then sys.restart("网络初始化失败!") end
+        if not socket.isReady() and not sys.waitUntil("IP_READY_IND", rstTim) then sys.restart("网络初始化失败!") end
         local mqttc = mqtt.client(clientID, keepAlive, conver(usr), conver(pwd), cleansession, will, "3.1.1")
         while not mqttc:connect(addr, port, ssl == "tcp_ssl" and ssl or nil, cert) do sys.wait((2 ^ idx) * 1000)idx = 2 ^ idx > 126320 and 0 or idx + 1 end
         -- 初始化订阅主题
@@ -347,7 +350,7 @@ local function oneNet_mqtt(cid, pios, reg, convert, passon, upprot, dwprot, keep
     local upprotFnc = upprot and upprot[cid] and upprot[cid] ~= "" and loadstring(upprot[cid]:match("function(.+)end"))
     while true do
         local idx, rsp = 0, false
-        if not socket.isReady() and not sys.waitUntil("IP_READY_IND", 300000) then sys.restart("网络初始化失败!") end
+        if not socket.isReady() and not sys.waitUntil("IP_READY_IND", rstTim) then sys.restart("网络初始化失败!") end
         local mqttc = mqtt.client(dat.data.device_id, keepAlive, pid, dat.data.key, cleanSession)
         while not mqttc:connect(addr, port) do sys.wait((2 ^ idx) * 1000)idx = 2 ^ idx > 126320 and 0 or idx + 1 end
         if mqttc:subscribe("$creq/#", qos) then
@@ -558,7 +561,7 @@ end
 -- 设备型注册
 local function bdiotDeviceReg(regio, schemaId, ak, sk)
     local host = "iotdm." .. regio .. ".baidubce.com"
-    if not socket.isReady() and not sys.waitUntil("IP_READY_IND", 120000) then sys.restart("网络初始化失败!") end
+    if not socket.isReady() and not sys.waitUntil("IP_READY_IND", rstTim) then sys.restart("网络初始化失败!") end
     local data = {
         deviceName = misc.getImei(),
         description = sim.getIccid(),
@@ -613,7 +616,7 @@ local function bdiotDataReg(regio, endpoint, ak, sk, principal, pk)
     local login = {}
     login.tcpEndpoint = "tcp://" .. endpoint .. ".mqtt.iot." .. regio .. ".baidubce.com:1883"
     login.sslEndpoint = "ssl://" .. endpoint .. ".mqtt.iot." .. regio .. ".baidubce.com:1884"
-    if not socket.isReady() and not sys.waitUntil("IP_READY_IND", 120000) then sys.restart("网络初始化失败!") end
+    if not socket.isReady() and not sys.waitUntil("IP_READY_IND", rstTim) then sys.restart("网络初始化失败!") end
     local data = {
         thingName = misc.getImei(),
         endpointName = endpoint,
@@ -756,7 +759,7 @@ end
 ---------------------------------------------------------- 参数配置,任务转发，线程守护主进程----------------------------------------------------------
 function connect(pios, conf, reg, convert, passon, upprot, dwprot)
     local flyTag = false
-    if not socket.isReady() and not sys.waitUntil("IP_READY_IND", 120000) then sys.restart("网络初始化失败!") end
+    if not socket.isReady() and not sys.waitUntil("IP_READY_IND", rstTim) then sys.restart("网络初始化失败!") end
     sys.waitUntil("DTU_PARAM_READY", 120000)
     -- 自动创建透传任务并填入参数
     for k, v in pairs(conf or {}) do
@@ -848,21 +851,19 @@ function connect(pios, conf, reg, convert, passon, upprot, dwprot)
     -- 守护进程
     while true do
         -- 这里是网络正常,但是链接服务器失败重启
-        if datalink then sys.timerStart(sys.restart, 1800000, "Server connection failed") end
-        if not datalink then softDog = softDog + 1 else softDog = 0 end
-        if softDog > 120 and not flyTag then
-            net.switchFly(true)
-            sys.wait(5000)
-            net.switchFly(false)
-            flyTag = true
-            softDog = 0
+        if datalink then
+            sys.timerStart(sys.restart, rstTim, "Server connection failed")
+            sys.timerStart(function()
+                net.switchFly(true)
+                sys.timerStart(net.switchFly, 5000, false)
+            end, flyTim)
         end
         sys.wait(1000)
     end
 end
 net.switchFly(false)
 -- NTP同步失败强制重启
-local tid = sys.timerStart(sys.restart, 180000, "同步时间失败,可能是GSM无法附着!")
+local tid = sys.timerStart(sys.restart, rstTim, "同步时间失败,可能是GSM无法附着!")
 sys.subscribe("NTP_SUCCEED", function()
     log.info("---------------------- 网络注册已成功 ----------------------")
     sys.timerStop(tid)
