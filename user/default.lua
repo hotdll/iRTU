@@ -185,13 +185,21 @@ end
 if not dtu.pins or not dtu.pins[3] or not pios[dtu.pins[3]] then -- 这么定义是为了和之前的代码兼容
     pins.setup(is4gLod and 68 or 29, function(msg)
         if msg ~= cpu.INT_GPIO_POSEDGE then
-            sys.restart("软件恢复出厂默认值:" .. (os.remove(CONFIG) and "OK" or "ERROR!"))
+            if io.exists(CONFIG) then os.remove(CONFIG) end
+            if io.exists("/alikey.cnf") then os.remove("/alikey.cnf") end
+            if io.exists("/qqiot.dat") then os.remove("/qqiot.dat") end
+            if io.exists("/bdiot.dat") then os.remove("/bdiot.dat") end
+            sys.restart("软件恢复出厂默认值: OK")
         end
     end, pio.PULLUP)
 else
     pins.setup(tonumber(dtu.pins[3]:sub(4, -1)), function(msg)
         if msg ~= cpu.INT_GPIO_POSEDGE then
-            sys.restart("软件恢复出厂默认值:" .. (os.remove(CONFIG) and "OK" or "ERROR!"))
+            if io.exists(CONFIG) then os.remove(CONFIG) end
+            if io.exists("/alikey.cnf") then os.remove("/alikey.cnf") end
+            if io.exists("/qqiot.dat") then os.remove("/qqiot.dat") end
+            if io.exists("/bdiot.dat") then os.remove("/bdiot.dat") end
+            sys.restart("软件恢复出厂默认值: OK")
         end
     end, pio.PULLUP)
     pios[dtu.pins[3]] = nil
