@@ -715,6 +715,8 @@ sys.taskInit(create.connect, pios, dtu.conf, dtu.reg, tonumber(dtu.convert) or 0
 ---------------------------------------------------------- 用户自定义任务初始化 ---------------------------------------------------------
 if dtu.task and #dtu.task ~= 0 then
     for i = 1, #dtu.task do
-        if dtu.task[i] and dtu.task[i]:match("function(.+)end") then sys.taskInit(loadstring(dtu.task[i]:match("function(.+)end"))) end
+        if dtu.task[i] and dtu.task[i]:match("function(.+)end") then
+            sys.taskInit(loadstring(dtu.task[i]:match("function(.+)end")))
+        end
     end
 end

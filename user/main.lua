@@ -22,6 +22,7 @@ if rtos.get_version():upper():find("ASR1802") then
     ril.request("AT+MEDCR=0,8,1")
     ril.request("AT+MEDCR=0,17,240")
     ril.request("AT+MEDCR=0,19,1")
+    rtos.set_trace_port(2)
 else
     wdt.setup(pio.P0_30, pio.P0_31)
 end
