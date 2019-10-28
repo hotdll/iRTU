@@ -122,39 +122,69 @@ data：当前小区和临近小区信息字符串，例如下面中的每一行�
 返回值：无
 ]]
 local function eemLteSvc(data)
-	if data:match("%+EEMLTESVC:%d+, %d+, %d+, .+") then
-		local mcc,mnc,lac,ci,rssi
-		local svcData = string.match(data, "%+EEMLTESVC:(.+)")
+    local mcc,mnc,lac,ci,rssi,svcData
+    if data:match("%+EEMLTESVC:%d+, %d+, %d+, .+") then
+        svcData = string.match(data, "%+EEMLTESVC:(.+)")
 
-		if svcData then
-			svcDataT = string.split(svcData, ', ')
-			mcc = svcDataT[1]
-			mnc = svcDataT[3]
-			lac = svcDataT[4]
-			ci = svcDataT[10]
-			rssi = (svcDataT[15]-(svcDataT[15]%3))/3
-			if rssi >31
-				then rssi = 31
-			end
-			if rssi < 0
-				then rssi = 0
-			end
-		end
-		if lac and ci and mcc and mnc then
-			--如果是第一条，清除信息表
-			resetCellInfo()
-			--保存mcc、mnc、lac、ci、rssi、ta
-			cellinfo[1].mcc = mcc
-			cellinfo[1].mnc = mnc
-			cellinfo[1].lac = tonumber(lac)
-			cellinfo[1].ci = tonumber(ci)
-			cellinfo[1].rssi = tonumber(rssi)
-			--cellinfo[id + 1].ta = tonumber(ta or "0")
-			--产生一个内部消息CELL_INFO_IND，表示读取到了新的当前小区和临近小区信息
-			if multicellcb then multicellcb(cellinfo) end
-			publish("CELL_INFO_IND", cellinfo)
-		end
-	end
+        if svcData then
+            svcDataT = string.split(svcData, ', ')
+            mcc = svcDataT[1]
+            mnc = svcDataT[3]
+            lac = svcDataT[4]
+            ci = svcDataT[10]
+            rssi = (svcDataT[15]-(svcDataT[15]%3))/3
+            if rssi>31 then rssi=31 end
+            if rssi<0 then rssi=0 end
+        end
+        if lac and ci and mcc and mnc then
+            --如果是第一条，清除信息表
+            resetCellInfo()
+            --保存mcc、mnc、lac、ci、rssi、ta
+            cellinfo[1].mcc = mcc
+            cellinfo[1].mnc = mnc
+            cellinfo[1].lac = tonumber(lac)
+            cellinfo[1].ci = tonumber(ci)
+            cellinfo[1].rssi = tonumber(rssi)
+            --cellinfo[id + 1].ta = tonumber(ta or "0")
+            --产生一个内部消息CELL_INFO_IND，表示读取到了新的当前小区和临近小区信息
+            if multicellcb then multicellcb(cellinfo) end
+            publish("CELL_INFO_IND", cellinfo)
+        end
+    elseif data:match("%+EEMLTEINTER") or data:match("%+EEMLTEINTRA") or data:match("%+EEMLTEINTERRAT") then
+        --data = "+EEMLTEINTRA: 0, 98, 39148, 51, 21, 1120, 0, 6311, 25418539"
+        --data = "+EEMLTEINTERRAT:0,16,1120,0,6213,26862,627,1,-77"
+        data = data:gsub(" ","")
+
+        if data:match("%+EEMLTEINTERRAT") then
+            mcc,mnc,lac,ci,rssi = data:match("[-]*%d+,[-]*%d+,([-]*%d+),([-]*%d+),([-]*%d+),([-]*%d+),[-]*%d+,[-]*%d+,([-]*%d+)")
+        else
+            rssi,mcc,mnc,lac,ci = data:match("[-]*%d+,[-]*%d+,[-]*%d+,([-]*%d+),[-]*%d+,([-]*%d+),([-]*%d+),([-]*%d+),([-]*%d+)")
+        end
+        
+        --print(mcc,mnc,lac,ci,rssi)
+
+        if rssi then
+            rssi = (rssi-(rssi%3))/3
+            if rssi>31 then rssi=31 end
+            if rssi<0 then rssi=0 end
+        end
+        if lac~="0" and lac~="-1" and ci~="0" and ci~="-1" then
+            for i = 1, cellinfo.cnt do
+                --print("cellinfo["..i.."].lac="..cellinfo[i].lac)
+                if cellinfo[i].lac==0 then
+                    cellinfo[i] = 
+                    {
+                        mcc = mcc,
+                        mnc = mnc,
+                        lac = tonumber(lac),
+                        ci = tonumber(ci),
+                        rssi = tonumber(rssi)
+                    }
+                    break
+                end
+            end
+        end
+    end
 end
 --[[
 函数名：eemMgInfoSvc
@@ -342,22 +372,22 @@ prefix：通知的前缀
 返回值：无
 ]]
 local function neturc(data, prefix)
-	if prefix == "+CREG" or prefix == "+CGREG" or prefix == "+CEREG" then
-		--收到网络状态变化时,更新一下信号值
-		csqQueryPoll()
-		--解析creg信息
-		creg(data)
-	elseif prefix == "+EEMLTESVC" then
-		eemLteSvc(data)
-	elseif prefix == "+EEMUMTSSVC" then
-		eemUMTSInfoSvc(data)
-	elseif prefix == "+EEMGINFOSVC" then
-		eemGsmInfoSvc(data)
-	elseif prefix == "+EEMGINFONC" then
-		eemGsmNCInfoSvc(data)
-	elseif prefix == "^MODE" then
-		UpdNetMode(data)
-	end
+    if prefix == "+CREG" or prefix == "+CGREG" or prefix == "+CEREG" then
+        --收到网络状态变化时,更新一下信号值
+        csqQueryPoll()
+        --解析creg信息
+        creg(data)
+    elseif prefix == "+EEMLTESVC" or prefix == "+EEMLTEINTRA" or prefix == "+EEMLTEINTER" or prefix=="+EEMLTEINTERRAT" then
+        eemLteSvc(data)
+    elseif prefix == "+EEMUMTSSVC" then
+        eemUMTSInfoSvc(data)
+    elseif prefix == "+EEMGINFOSVC" then
+        eemGsmInfoSvc(data)
+    elseif prefix == "+EEMGINFONC" then
+        eemGsmNCInfoSvc(data)   
+    elseif prefix == "^MODE" then
+        UpdNetMode(data)
+    end
 end
 
 --- 设置飞行模式
@@ -382,7 +412,13 @@ function switchFly(mode)
 end
 
 --- 获取netmode
--- @return netMode
+-- @return number netMode,注册的网络类型
+-- 0：未注册
+-- 1：2G GSM网络
+-- 2：2.5G EDGE数据网络
+-- 3：3G TD网络
+-- 4：4G LTE网络
+-- 5：3G WCDMA网络
 -- @usage net.getNetMode()
 function getNetMode()
 	return netMode
@@ -615,6 +651,9 @@ ril.regUrc("+CGREG", neturc)
 ril.regUrc("+CEREG", neturc)
 --ril.regUrc("+CENG", neturc)
 ril.regUrc("+EEMLTESVC", neturc)
+ril.regUrc("+EEMLTEINTER", neturc)
+ril.regUrc("+EEMLTEINTRA", neturc)
+ril.regUrc("+EEMLTEINTERRAT", neturc)
 ril.regUrc("+EEMGINFOSVC", neturc)
 ril.regUrc("+EEMGINFONC", neturc)
 ril.regUrc("+EEMUMTSSVC", neturc)
@@ -631,6 +670,10 @@ ril.request("AT+CEREG=2")
 ril.request("AT+CREG?")
 ril.request("AT+CGREG?")
 ril.request("AT+CEREG?")
+ril.request("AT*MRD_CDF=Q,GsmCalData.nvm")
+ril.request("AT*MRD_CDF=Q,aplp_rf_calibration.nvm")
+ril.request("AT*MRD_CDF=Q,LteCalData.nvm")
+ril.request("AT*BAND?")
 setEngMode(1)
 --重置当前小区和临近小区信息表
 resetCellInfo()

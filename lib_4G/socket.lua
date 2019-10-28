@@ -118,8 +118,9 @@ function mt:connect(address, port, timeout)
     
     self.address = address
     self.port = port
+    local socket_connect_fnc = (type(socketcore.sock_conn_ext)=="function") and socketcore.sock_conn_ext or socketcore.sock_conn
     if self.protocol == 'TCP' then
-        self.id = socketcore.sock_conn(0, address, port)
+        self.id = socket_connect_fnc(0, address, port)
     elseif self.protocol == 'TCPSSL' then
         local cert = {hostName = address}
         if self.cert then
@@ -136,9 +137,29 @@ function mt:connect(address, port, timeout)
                 cert.clientKey = io.readFile(self.cert.clientKey)
             end
         end
-        self.id = socketcore.sock_conn(2, address, port, cert)
+        self.id = socket_connect_fnc(2, address, port, cert)
     else
-        self.id = socketcore.sock_conn(1, address, port)
+        self.id = socket_connect_fnc(1, address, port)
+    end
+    if type(socketcore.sock_conn_ext)=="function" then
+        if not self.id or self.id<0 then
+            if self.id==-2 then
+                require "http"
+                --请求腾讯云免费HttpDns解析
+                http.request("GET", "119.29.29.29/d?dn=" .. address, nil, nil, nil, 40000,
+                    function(result, statusCode, head, body)
+                        log.info("socket.httpDnsCb", result, statusCode, head, body)
+                        sys.publish("SOCKET_HTTPDNS_RESULT_"..address.."_"..port, result, statusCode, head, body)
+                    end)
+                local _, result, statusCode, head, body = sys.waitUntil("SOCKET_HTTPDNS_RESULT_"..address.."_"..port)
+                
+                --DNS解析成功
+                if result and statusCode == "200" and body and body:match("^[%d%.]+") then
+                    return self:connect(body:match("^([%d%.]+)"),port,timeout)                
+                end
+            end
+            self.id = nil
+        end
     end
     if not self.id then
         log.info("socket:connect: core sock conn error", self.protocol, address, port, self.cert)
@@ -174,6 +195,7 @@ function mt:asyncSelect(keepAlive, pingreq)
     end
     
     self.wait = "SOCKET_SEND"
+    --log.info("socket.asyncSelect #self.output",#self.output)
     while #self.output ~= 0 do
         local data = table.concat(self.output)
         self.output = {}
@@ -183,11 +205,13 @@ function mt:asyncSelect(keepAlive, pingreq)
             if self.timeout then
                 self.timerId = sys.timerStart(coroutine.resume, self.timeout * 1000, self.co, false, "TIMEOUT")
             end
+            --log.info("socket.asyncSelect self.timeout",self.timeout)
             local result, reason = coroutine.yield()
             if self.timerId and reason ~= "TIMEOUT" then sys.timerStop(self.timerId) end
             sys.publish("SOCKET_ASYNC_SEND", result)
             if not result then
                 sys.publish("LIB_SOCKET_SEND_FAIL_IND", self.ssl, self.protocol, self.address, self.port)
+                --log.warn('socket.asyncSelect', 'send error')
                 return false
             end
         end
@@ -215,6 +239,7 @@ function mt:asyncSend(data, timeout)
     end
     self.timeout = timeout
     table.insert(self.output, data or "")
+    --log.info("socket.asyncSend",self.wait)
     if self.wait == "SOCKET_WAIT" then coroutine.resume(self.co, true) end
     return true
 end

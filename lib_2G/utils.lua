@@ -162,6 +162,24 @@ function string.split(str, delimiter)
     return strlist
 end
 
+-- 和校验
+-- @string str 需要校验的字符串
+-- @string number 1为返回1个字节，2为返回2个字节
+-- @retrun 返回和校验结果
+-- @usage string.checkSum("1234",1)
+function string.checkSum(str, num)
+    assert(type(str) == "string", "The first argument is not a string!")
+    local sum = 0
+    for i = 1, #str do
+        sum = sum + str:sub(i, i):byte()
+    end
+    if num == 2 then
+        return sum % 0x10000
+    else
+        return sum % 0x100
+    end
+end
+
 --- 判断文件是否存在
 -- @string path,文件全名例如："/ldata/call.mp3"
 -- @return boole,存在为true,不存在为false
@@ -219,7 +237,7 @@ function io.pathInfo(path)
         end
         pos = pos - 1
     end
-
+    
     local dirname = string.sub(path, 1, pos)
     local filename = string.sub(path, pos + 1)
     extpos = extpos - pos

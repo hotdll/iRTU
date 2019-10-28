@@ -22,6 +22,7 @@ function isReady() return ready end
 -- apn，用户名，密码
 local apnname, username, password
 local dnsIP
+local authProt,authApn,authUser,authPassword
 
 function setAPN(apn, user, pwd)
     apnname, username, password = apn, user, pwd
@@ -31,7 +32,20 @@ function setDnsIP(ip1, ip2)
     dnsIP = "\"" .. (ip1 or "") .. "\",\"" .. (ip2 or "") .. "\""
 end
 
---- 设置带加密方式的专网APN(注意：在main.lua中，最早可以执行代码的位置调用此接口)
+local function setCgdf()
+    request("AT+AUTOAPN=0")
+    request('AT*CGDFLT=1,"IP","'..authApn..'",,,,,,,,,,,,,,,,,,1')
+    request('AT*CGDFAUTH=1,'..authProt..',"'..authUser..'","'..authPassword..'"',nil,function(cmd,result)
+        if result then
+            sys.restart("CGDFAUTH")
+        else
+            sys.timerStart(setCgdf,5000)
+        end
+    end)
+end
+
+--- 设置专网卡APN(注意：在main.lua中，尽可能靠前的位置调用此接口)
+-- 第一次设置成功之后，软件会自动重启，因为重启后才能生效
 -- @number[opt=0] prot，加密方式， 0:不加密  1:PAP  2:CHAP
 -- @string[opt=""] apn，apn名称
 -- @string[opt=""] user，apn用户名
@@ -40,14 +54,20 @@ end
 -- @usage
 -- c = link.setAuthApn(2,"MYAPN","MYNAME","MYPASSWORD")
 function setAuthApn(prot,apn,user,pwd)
-    request('AT*CGDFLT=1,"IP","'..(apn or '')..'",,,,,,,,,,,,,,,,,,1')
-    request('AT*CGDFAUTH=0,'..(prot or 0)..',"'..(user or '')..'","'..(pwd or '')..'"')
+    authProt,authApn,authUser,authPassword = prot or 0,apn or "",user or "",pwd or ""
+    request("AT*CGDFLT?")
+    ril.regUrc("*CGDFLT", function(data)
+        local dftApn = data:match("CGDFLT:%s*\"%w*\",\"(.-)\"")
+        if dftApn~=authApn then
+            setCgdf()
+        end
+    end)
 end
 
 local function Pdp_Act()
     log.info("link.Pdp_Act",ready,net.getNetMode(), gprsAttached)
     if ready then 
-        request("AT+CGDCONT?")
+        request("AT+CGDCONT?",nil,cgdcontRsp)
         return 
     end
     if net.getNetMode() == net.NetMode_LTE then
@@ -58,7 +78,7 @@ local function Pdp_Act()
         if not apnname then
             sys.timerStart(pdpCmdCnf, 1000, "SET_PDP_4G_WAITAPN",true)
         else
-            request("AT+CGDCONT?")
+            request("AT+CGDCONT?",nil,cgdcontRsp)
             --request(string.format('AT*CGDFLT=0,"IP","%s"', apnname), nil, pdpCmdCnf)
         end
     else
@@ -157,26 +177,35 @@ function IsExistActivedCid(data)
 	return
 end
 
+local cgdcontResult
+
+function cgdcontRsp()
+    if cgdcontResult then pdpCmdCnf("CONNECT_DELAY",true) end
+end
+
 function pdpCmdCnf(curCmd, result,respdata, interdata)
     log.info("link.pdpCmdCnf",curCmd, result,respdata, interdata)
     if string.find(curCmd, "CGDCONT%?") then
         if result and interdata then           
             result=analysis_cgdcont(interdata)
-		else
-			result = false
+        else
+            result = false
         end
-    end
+    end   
+    
     if result then
+        cgdcontResult = false
         if string.find(curCmd, "CGDCONT=") then
             request(string.format('AT+CGACT=1,%d',cid_manual), nil, pdpCmdCnf)
         elseif string.find(curCmd, "CGDCONT%?") then
-            sys.timerStart(pdpCmdCnf, 100, "CONNECT_DELAY",true)
+            --sys.timerStart(pdpCmdCnf, 100, "CONNECT_DELAY",true)
+            cgdcontResult = true
         elseif string.find(curCmd, "CONNECT_DELAY") then
             log.info("publish IP_READY_IND")
             ready = true
             publish("IP_READY_IND")
         elseif string.find(curCmd, "CGACT=") then
-            request("AT+CGDCONT?")
+            request("AT+CGDCONT?",nil,cgdcontRsp)
 		elseif string.find(curCmd, "CGACT%?") then
 			if IsExistActivedCid(interdata) then
 				sys.timerStart(pdpCmdCnf, 100, "CONNECT_DELAY",true)
@@ -184,19 +213,19 @@ function pdpCmdCnf(curCmd, result,respdata, interdata)
 				request(string.format('AT+CGDCONT=%d,"IP","%s"', cid_manual,apnname), nil, pdpCmdCnf)
 			end
         elseif string.find(curCmd, "CGDFLT") then
-            request("AT+CGDCONT?")
+            request("AT+CGDCONT?",nil,cgdcontRsp)
         elseif string.find(curCmd,"SET_PDP_4G_WAITAPN") then
             if not apnname then
                 sys.timerStart(pdpCmdCnf, 100, "SET_PDP_4G_WAITAPN",true)
             else
-			    request("AT+CGDCONT?", nil, nil,1000)
+			    request("AT+CGDCONT?", nil, cgdcontRsp,1000)
            --   request(string.format('AT*CGDFLT=0,"IP","%s"', apnname), nil, pdpCmdCnf)
             end
         end
     else
         if net.getState() ~= 'REGISTERED' then return end
         if net.getNetMode() == net.NetMode_LTE then
-            request("AT+CGDCONT?", nil, nil,1000)
+            request("AT+CGDCONT?", nil, cgdcontRsp,1000)
         else
             request("AT+CGATT?", nil, nil, 1000)
         end        

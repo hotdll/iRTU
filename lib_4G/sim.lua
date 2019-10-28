@@ -103,6 +103,12 @@ local function urc(data, prefix)
     end
 end
 
+function set2gSim()
+    ril.request("AT+MEDCR=0,8,1")
+    ril.request("AT+MEDCR=0,17,240")
+    ril.request("AT+MEDCR=0,19,1")
+end
+
 --注册AT+CCID命令的应答处理函数
 ril.regRsp("+ICCID", rsp)
 --注册AT+CIMI命令的应答处理函数

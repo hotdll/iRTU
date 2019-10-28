@@ -264,9 +264,9 @@ function mt:connect(address, port, timeout)
         http.request("GET", "119.29.29.29/d?dn=" .. address, nil, nil, nil, 40000,
             function(result, statusCode, head, body)
                 log.info("socket.httpDnsCb", result, statusCode, head, body)
-                sys.publish("SOCKET_HTTPDNS_RESULT", result, statusCode, head, body)
+                sys.publish("SOCKET_HTTPDNS_RESULT_"..address.."_"..port, result, statusCode, head, body)
             end)
-        local _, result, statusCode, head, body = sys.waitUntil("SOCKET_HTTPDNS_RESULT")
+        local _, result, statusCode, head, body = sys.waitUntil("SOCKET_HTTPDNS_RESULT_"..address.."_"..port)
         
         --DNS解析成功
         if result and statusCode == "200" and body and body:match("^[%d%.]+") then

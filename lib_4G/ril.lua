@@ -248,9 +248,10 @@ local function procatc(data)
     end
 
     if data:match("^%+EEMLTEINTER") or data:match("^%+EEMLTEINTRA") or data:match("^%+EEMUMTSINTER") or data:match("^%+EEMUMTSINTRA") then
-        return
+        
+    else
+        log.info("ril.proatc", data)
     end
-    log.info("ril.proatc", data)
 
     --当前无命令在执行则判定为urc
     if currcmd == nil then
