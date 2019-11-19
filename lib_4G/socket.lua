@@ -227,6 +227,11 @@ function mt:asyncSelect(keepAlive, pingreq)
     end
     return coroutine.yield()
 end
+
+function mt:getAsyncSend()
+    if self.error then return 0 end
+    return #(self.output)
+end
 --- 异步发送数据
 -- @string data 数据
 -- @number[opt=nil] timeout 可选参数，发送超时时间，单位秒；为nil时表示不支持timeout
@@ -290,22 +295,25 @@ end
 --- 接收数据
 -- @number[opt=0] timeout 可选参数，接收超时时间，单位毫秒
 -- @string[opt=nil] msg 可选参数，控制socket所在的线程退出recv阻塞状态
+-- @bool[opt=nil] msgNoResume 可选参数，控制socket所在的线程退出recv阻塞状态，false或者nil表示“在recv阻塞状态，收到msg消息，可以退出阻塞状态”，true表示不退出
 -- @return result 数据接收结果，true表示成功，false表示失败
--- @return data 如果成功的话，返回接收到的数据；超时时返回错误为"timeout"；msg控制退出时返回msg
+-- @return data 如果成功的话，返回接收到的数据；超时时返回错误为"timeout"；msg控制退出时返回msg的字符串
+-- @return param 如果是msg返回的false，则data的值是msg，param的值是msg的参数
 -- @usage c = socket.tcp(); c:connect()
 -- @usage result, data = c:recv()
 -- @usage false,msg,param = c:recv(60000,"publish_msg")
-function mt:recv(timeout, msg)
+function mt:recv(timeout, msg, msgNoResume)
     assert(self.co == coroutine.running(), "socket:recv: coroutine mismatch")
     if self.error then
         log.warn('socket.client:recv', 'error', self.error)
         return false
     end
+    self.msgNoResume = msgNoResume
     if msg and not self.iSubscribe then
         self.iSubscribe = msg
         self.subMessage = function(data)
             if data then table.insert(self.output, data) end
-            if self.wait == "+RECEIVE" then coroutine.resume(self.co, 0xAA) end
+            if self.wait == "+RECEIVE" and not self.msgNoResume then coroutine.resume(self.co, 0xAA) end
         end
         sys.subscribe(msg, self.subMessage)
     end
@@ -412,9 +420,10 @@ rtos.on(rtos.MSG_SOCK_CLOSE_IND, function(msg)
     sockets[msg.socket_index].error = 'CLOSED'
     socketsConnected = sockets[msg.socket_index].connected or socketsConnected
     sys.publish("SOCKET_ACTIVE", socketsConnected)
+    --[[
     if type(socketcore.sock_destroy) == "function" then
         socketcore.sock_destroy(msg.socket_index)
-    end
+    end]]
     coroutine.resume(sockets[msg.socket_index].co, false, "CLOSED")
 end)
 rtos.on(rtos.MSG_SOCK_RECV_IND, function(msg)

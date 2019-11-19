@@ -237,7 +237,7 @@ function io.pathInfo(path)
         end
         pos = pos - 1
     end
-    
+
     local dirname = string.sub(path, 1, pos)
     local filename = string.sub(path, pos + 1)
     extpos = extpos - pos

@@ -15,7 +15,7 @@ local publish = sys.publish
 local request = ril.request
 local ready = false
 local gprsAttached
-local cid_manual=6
+local cid_manual=5
 
 function isReady() return ready end
 
@@ -210,7 +210,7 @@ function pdpCmdCnf(curCmd, result,respdata, interdata)
 			if IsExistActivedCid(interdata) then
 				sys.timerStart(pdpCmdCnf, 100, "CONNECT_DELAY",true)
 			else
-				request(string.format('AT+CGDCONT=%d,"IP","%s"', cid_manual,apnname), nil, pdpCmdCnf)
+				request(string.format('AT+CGDCONT=%d,"IP","%s"', cid_manual,authApn or apnname), nil, pdpCmdCnf)
 			end
         elseif string.find(curCmd, "CGDFLT") then
             request("AT+CGDCONT?",nil,cgdcontRsp)
