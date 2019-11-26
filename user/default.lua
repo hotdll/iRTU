@@ -25,6 +25,7 @@ module(..., package.seeall)
 
 -- 判断模块类型
 local is4gLod = rtos.get_version():upper():find("ASR1802")
+local is1802S = rtos.get_version():upper():find("ASR1802S")
 local isTTS = rtos.get_version():upper():find("TTS") or rtos.get_version():upper():find("8955F")
 -- 用户的配置参数
 local CONFIG = "/CONFIG.cnf"
@@ -118,7 +119,7 @@ if io.exists(CONFIG) then
 end
 ---------------------------------------------------------- 用户控制 GPIO 配置 ----------------------------------------------------------
 -- 用户可用IO列表
-pios = is4gLod and {
+pios = is1802S and {
     pio23 = pins.setup(23, 0, pio.PULLUP), -- 默认UART1的485方向控制脚
     pio26 = pins.setup(26, nil, pio.PULLDOWN),
     pio27 = pins.setup(27, nil, pio.PULLDOWN),
@@ -127,8 +128,19 @@ pios = is4gLod and {
     pio34 = pins.setup(34, nil, pio.PULLDOWN),
     pio35 = pins.setup(35, nil, pio.PULLDOWN),
     pio36 = pins.setup(36, nil, pio.PULLDOWN),
-    -- pio53 = pins.setup(53, nil, pio.PULLDOWN),
-    -- pio54 = pins.setup(54, nil, pio.PULLDOWN),
+    pio62 = pins.setup(62, nil, pio.PULLDOWN),
+    pio63 = pins.setup(63, nil, pio.PULLDOWN),
+    pio64 = pins.setup(64, nil, pio.PULLDOWN), -- NETLED
+    pio65 = pins.setup(65, nil, pio.PULLDOWN),
+} or (is4gLod and {
+    pio23 = pins.setup(23, 0, pio.PULLUP), -- 默认UART1的485方向控制脚
+    pio26 = pins.setup(26, nil, pio.PULLDOWN),
+    pio27 = pins.setup(27, nil, pio.PULLDOWN),
+    pio28 = pins.setup(28, nil, pio.PULLDOWN),
+    pio33 = pins.setup(33, nil, pio.PULLDOWN),
+    pio34 = pins.setup(34, nil, pio.PULLDOWN),
+    pio35 = pins.setup(35, nil, pio.PULLDOWN),
+    pio36 = pins.setup(36, nil, pio.PULLDOWN),
     pio55 = pins.setup(55, nil, pio.PULLDOWN),
     pio56 = pins.setup(56, nil, pio.PULLDOWN),
     pio59 = pins.setup(59, 0, pio.PULLUP), -- 默认UART2的485方向控制脚
@@ -136,7 +148,7 @@ pios = is4gLod and {
     pio63 = pins.setup(63, nil, pio.PULLDOWN),
     pio64 = pins.setup(64, nil, pio.PULLDOWN), -- NETLED
     pio65 = pins.setup(65, nil, pio.PULLDOWN), -- NETREADY
-    pio67 = pins.setup(67, nil, pio.PULLDOWN), -- NETLED
+    pio67 = pins.setup(67, nil, pio.PULLDOWN),
     pio68 = pins.setup(68, nil, pio.PULLDOWN), -- RSTCNF
     pio69 = pins.setup(69, nil, pio.PULLDOWN),
     pio70 = pins.setup(70, nil, pio.PULLDOWN),
@@ -171,7 +183,7 @@ pios = is4gLod and {
     pio29 = pins.setup(pio.P0_29, nil, pio.PULLDOWN), -- 默认恢复默认值
     pio33 = pins.setup(pio.P1_1, nil, pio.PULLDOWN), -- 默认800 NETLED
     pio34 = pins.setup(pio.P1_2, nil, pio.PULLDOWN),
-}
+})
 
 -- 网络READY信号
 if not dtu.pins or not dtu.pins[2] or not pios[dtu.pins[2]] then -- 这么定义是为了和之前的代码兼容
@@ -517,7 +529,7 @@ function uart_INIT(i, uconf)
     end)
     -- 485方向控制
     if not dtu.uconf[i][6] or dtu.uconf[i][6] == "" then -- 这么定义是为了和之前的代码兼容
-        default["dir" .. i] = i == 1 and (is4gLod and 23 or 2) or (is4gLod and 59 or 6)
+        default["dir" .. i] = i == 1 and (is1802S and 61 or (is4gLod and 23 or 2)) or (is1802S and 32 or (is4gLod and 59 or 6))
     else
         if pios[dtu.uconf[i][6]] then
             default["dir" .. i] = tonumber(dtu.uconf[i][6]:sub(4, -1))
