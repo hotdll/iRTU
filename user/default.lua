@@ -120,18 +120,41 @@ end
 ---------------------------------------------------------- 用户控制 GPIO 配置 ----------------------------------------------------------
 -- 用户可用IO列表
 pios = is1802S and {
-    pio23 = pins.setup(23, 0, pio.PULLUP), -- 默认UART1的485方向控制脚
+    pio10 = pins.setup(10, nil, pio.PULLDOWN),
+    pio11 = pins.setup(11, nil, pio.PULLDOWN),
+    -- pio17 = pins.setup(17, nil, pio.PULLDOWN),
+    pio18 = pins.setup(18, nil, pio.PULLDOWN),
+    -- pio20 = pins.setup(20, nil, pio.PULLDOWN),
+    pio23 = pins.setup(23, nil, pio.PULLDOWN),
+    -- pio24 = pins.setup(24, nil, pio.PULLDOWN),
+    -- pio25 = pins.setup(25, nil, pio.PULLDOWN),
     pio26 = pins.setup(26, nil, pio.PULLDOWN),
     pio27 = pins.setup(27, nil, pio.PULLDOWN),
     pio28 = pins.setup(28, nil, pio.PULLDOWN),
+    -- pio29 = pins.setup(29, nil, pio.PULLDOWN),
+    -- pio30 = pins.setup(30, nil, pio.PULLDOWN),
+    pio31 = pins.setup(31, nil, pio.PULLDOWN),
+    pio32 = pins.setup(32, 0, pio.PULLUP), -- UART2 485 默认方向脚
     pio33 = pins.setup(33, nil, pio.PULLDOWN),
     pio34 = pins.setup(34, nil, pio.PULLDOWN),
     pio35 = pins.setup(35, nil, pio.PULLDOWN),
     pio36 = pins.setup(36, nil, pio.PULLDOWN),
+    -- pio37 = pins.setup(37, nil, pio.PULLDOWN),
+    -- pio38 = pins.setup(38, nil, pio.PULLDOWN),
+    -- pio39 = pins.setup(39, nil, pio.PULLDOWN),
+    -- pio40 = pins.setup(40, nil, pio.PULLDOWN),
+    -- pio41 = pins.setup(41, nil, pio.PULLDOWN),
+    -- pio42 = pins.setup(42, nil, pio.PULLDOWN),
+    pio49 = pins.setup(49, nil, pio.PULLDOWN),
+    pio50 = pins.setup(50, nil, pio.PULLDOWN),
+    -- pio51 = pins.setup(51, nil, pio.PULLDOWN),
+    -- pio52 = pins.setup(52, nil, pio.PULLDOWN),
+    pio61 = pins.setup(61, 0, pio.PULLUP), -- UART1 485 默认方向脚
     pio62 = pins.setup(62, nil, pio.PULLDOWN),
     pio63 = pins.setup(63, nil, pio.PULLDOWN),
-    pio64 = pins.setup(64, nil, pio.PULLDOWN), -- NETLED
+    pio64 = pins.setup(64, 0, pio.PULLUP), -- NETLED
     pio65 = pins.setup(65, nil, pio.PULLDOWN),
+-- pio66 = pins.setup(66, nil, pio.PULLDOWN),
 } or (is4gLod and {
     pio23 = pins.setup(23, 0, pio.PULLUP), -- 默认UART1的485方向控制脚
     pio26 = pins.setup(26, nil, pio.PULLDOWN),
@@ -440,10 +463,24 @@ local function read(uid)
     end
     -- 执行单次HTTP指令
     if s:sub(1, 5) == "http," then
-        local t = s:match("(.+)\r\n") and s:match("(.+)\r\n"):split(',') or s:split(',')
+        local str = ""
+        local idx1, idx2, jsonstr = s:find(",[\'\"](.+)[\'\"],")
+        if jsonstr then
+            str = s:sub(1, idx1) .. s:sub(idx2, -1)
+        else
+            -- 判是不是json，如果不是json，则是普通的字符串
+            idx1, idx2, jsonstr = s:find(",([%[{].+[%]}]),")
+            if jsonstr then
+                str = s:sub(1, idx1) .. s:sub(idx2, -1)
+            else
+                str = s
+            end
+        end
+        log.info(string.format("HTTP的参数:%s\n提交的内容:%s", str, jsonstr))
+        local t = str:match("(.+)\r\n") and str:match("(.+)\r\n"):split(',') or str:split(',')
         if not socket.isReady() then write(uid, "NET_NORDY\r\n") return end
         sys.taskInit(function(t, uid)
-            local code, head, body = httpv2.request(t[2]:upper(), t[3], (t[4] or 10) * 1000, nil, t[5], tonumber(t[6]) or 1, t[7], t[8])
+            local code, head, body = httpv2.request(t[2]:upper(), t[3], (t[4] or 10) * 1000, nil, jsonstr or t[5], tonumber(t[6]) or 1, t[7], t[8])
             log.info("uart http response:", body)
             write(uid, body)
         end, t, uid)
@@ -451,7 +488,8 @@ local function read(uid)
     end
     -- 执行单次SOCKET透传指令
     if s:sub(1, 4):upper() == "TCP," or s:sub(1, 4):upper() == "UDP," then
-        local t = s:match("(.+)\r\n") and s:match("(.+)\r\n"):split(',') or s:split(',')
+        -- local t = s:match("(.+)\r\n") and s:match("(.+)\r\n"):split(',') or s:split(',')
+        s = s:match("(.+)\r\n") or s
         if not socket.isReady() then
             write(uid, "NET_NORDY\r\n")
             return
@@ -467,7 +505,7 @@ local function read(uid)
                 write(uid, "SEND_ERR\r\n")
             end
             c:close()
-        end, uid, unpack(t))
+        end, uid, s:match("(.-),(.-),(.-),(.-),(.-),(.+)"))
         return
     end
     -- 添加设备识别码
