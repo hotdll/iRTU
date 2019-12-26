@@ -476,7 +476,6 @@ local function read(uid)
                 str = s
             end
         end
-        log.info(string.format("HTTP的参数:%s\n提交的内容:%s", str, jsonstr))
         local t = str:match("(.+)\r\n") and str:match("(.+)\r\n"):split(',') or str:split(',')
         if not socket.isReady() then write(uid, "NET_NORDY\r\n") return end
         sys.taskInit(function(t, uid)

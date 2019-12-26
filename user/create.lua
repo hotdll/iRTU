@@ -119,46 +119,45 @@ local function tcpTask(cid, pios, reg, convert, passon, upprot, dwprot, prot, pi
         local c = prot == "TCP" and socket.tcp(ssl and ssl:lower() == "ssl") or socket.udp()
         while not c:connect(addr, port) do sys.wait((2 ^ idx) * 1000)idx = 2 ^ idx > 126320 and 0 or idx + 1 end
         -- 登陆报文
-        if c:send(login or loginMsg(reg)) then
-            interval[uid], samptime[uid] = tonumber(gap) or 0, tonumber(report) or 0
-            while true do
-                datalink = true
-                local result, data, param = c:recv(timeout * 1000, "NET_SENT_RDY_" .. (passon and cid or uid))
-                if result then
-                    -- 这里执行用户自定义的指令
-                    if data:sub(1, 5) == "rrpc," then
-                        local res, msg = pcall(userapi, data, pios)
-                        if not res then log.error("远程查询的API错误:", msg) end
-                        if convert == 0 and upprotFnc then -- 转换为用户自定义报文
-                            res, msg = pcall(upprotFnc, msg)
-                            if not res then log.error("数据流模版错误:", msg) end
-                        end
-                        if not c:send(msg) then break end
-                    elseif convert == 1 then -- 转换HEX String
-                        sys.publish("NET_RECV_WAIT_" .. uid, uid, (data:fromHex()))
-                    elseif convert == 0 and dwprotFnc then -- 转换用户自定义报文
-                        local res, msg = pcall(dwprotFnc, data)
+        if login or loginMsg(reg) then c:send(login or loginMsg(reg)) end
+        interval[uid], samptime[uid] = tonumber(gap) or 0, tonumber(report) or 0
+        while true do
+            datalink = true
+            local result, data, param = c:recv(timeout * 1000, "NET_SENT_RDY_" .. (passon and cid or uid))
+            if result then
+                -- 这里执行用户自定义的指令
+                if data:sub(1, 5) == "rrpc," then
+                    local res, msg = pcall(userapi, data, pios)
+                    if not res then log.error("远程查询的API错误:", msg) end
+                    if convert == 0 and upprotFnc then -- 转换为用户自定义报文
+                        res, msg = pcall(upprotFnc, msg)
                         if not res then log.error("数据流模版错误:", msg) end
-                        sys.publish("NET_RECV_WAIT_" .. uid, uid, res and msg or data)
-                    else -- 默认不转换
-                        sys.publish("NET_RECV_WAIT_" .. uid, uid, data)
                     end
-                elseif data == ("NET_SENT_RDY_" .. (passon and cid or uid)) then
-                    if convert == 1 then -- 转换为Hex String 报文
-                        if not c:send((param:toHex())) then if passon then sys.publish("UART_SENT_RDY_" .. uid, uid, "SEND_ERROR\r\n") end break end
-                    elseif convert == 0 and upprotFnc then -- 转换为用户自定义报文
-                        local res, msg = pcall(upprotFnc, param)
-                        if not res then log.error("数据流模版错误:", msg) end
-                        if not c:send(res and msg or param) then if passon then sys.publish("UART_SENT_RDY_" .. uid, uid, "SEND_ERROR\r\n") end break end
-                    else -- 默认不转换
-                        if not c:send(param) then if passon then sys.publish("UART_SENT_RDY_" .. uid, uid, "SEND_ERROR\r\n") end break end
-                    end
-                    if passon then sys.publish("UART_SENT_RDY_" .. uid, uid, "SEND_OK\r\n") end
-                elseif data == "timeout" then
-                    if not c:send(conver(ping)) then break end
-                else
-                    break
+                    if not c:send(msg) then break end
+                elseif convert == 1 then -- 转换HEX String
+                    sys.publish("NET_RECV_WAIT_" .. uid, uid, (data:fromHex()))
+                elseif convert == 0 and dwprotFnc then -- 转换用户自定义报文
+                    local res, msg = pcall(dwprotFnc, data)
+                    if not res then log.error("数据流模版错误:", msg) end
+                    sys.publish("NET_RECV_WAIT_" .. uid, uid, res and msg or data)
+                else -- 默认不转换
+                    sys.publish("NET_RECV_WAIT_" .. uid, uid, data)
                 end
+            elseif data == ("NET_SENT_RDY_" .. (passon and cid or uid)) then
+                if convert == 1 then -- 转换为Hex String 报文
+                    if not c:send((param:toHex())) then if passon then sys.publish("UART_SENT_RDY_" .. uid, uid, "SEND_ERROR\r\n") end break end
+                elseif convert == 0 and upprotFnc then -- 转换为用户自定义报文
+                    local res, msg = pcall(upprotFnc, param)
+                    if not res then log.error("数据流模版错误:", msg) end
+                    if not c:send(res and msg or param) then if passon then sys.publish("UART_SENT_RDY_" .. uid, uid, "SEND_ERROR\r\n") end break end
+                else -- 默认不转换
+                    if not c:send(param) then if passon then sys.publish("UART_SENT_RDY_" .. uid, uid, "SEND_ERROR\r\n") end break end
+                end
+                if passon then sys.publish("UART_SENT_RDY_" .. uid, uid, "SEND_OK\r\n") end
+            elseif data == "timeout" then
+                if not c:send(conver(ping)) then break end
+            else
+                break
             end
         end
         c:close()
@@ -789,7 +788,7 @@ function connect(pios, conf, reg, convert, passon, upprot, dwprot)
                             msg = res and dat or msg
                         end
                         if passon then sys.publish("UART_SENT_RDY_" .. uid, uid, "SEND_OK\r\n") end
-                        local code, head, body = httpv2.request(method:upper(), url, timeout * 1000, way == 0 and msg or nil, way == 1 and msg or nil, dtpye, basic, headers)
+                        local code, head, body = httpv2.request(method:upper(), url, timeout * 1000, way == 0 and msg or nil, way == 1 and msg or nil, dtype, basic, headers)
                         local headstr = ""
                         if type(head) == "table" then
                             for k, v in pairs(head) do headstr = headstr .. k .. ": " .. v .. "\r\n" end
