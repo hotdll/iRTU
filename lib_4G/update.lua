@@ -26,11 +26,11 @@ local function processOta(stepData,totalLen,statusCode)
     if stepData and totalLen then
         if statusCode=="200" or statusCode=="206" then            
             if rtos.fota_process((sProcessedLen+stepData:len()>totalLen) and stepData:sub(1,totalLen-sProcessedLen) or stepData,totalLen)~=0 then 
-                log.error("updata.processOta","fail")
+                log.error("update.processOta","fail")
                 return false
             else
                 sProcessedLen = sProcessedLen + stepData:len()
-                log.info("updata.processOta",totalLen,sProcessedLen,(sProcessedLen*100/totalLen).."%")
+                log.info("update.processOta",totalLen,sProcessedLen,(sProcessedLen*100/totalLen).."%")
                 --if sProcessedLen*100/totalLen==sBraekTest then return false end
                 if sProcessedLen*100/totalLen>=100 then return true end
             end

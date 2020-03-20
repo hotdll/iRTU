@@ -53,8 +53,9 @@ function request(method, url, timeout, params, data, ctype, basic, headers, cert
             ['Accept-Language'] = 'zh-CN,zh,cn',
             ['Content-Type'] = 'application/x-www-form-urlencoded',
             ['Content-Length'] = '0',
-            ['Connection'] = 'Keep-alive',
+            ['Connection'] = 'close',
             ["Keep-Alive"] = 'timeout=20',
+            ["Content-Encoding"] = "gzip",
         }
     end
     ssl = string.find(rtos.get_version(), 'SSL') or string.find(rtos.get_version(), '8955F')

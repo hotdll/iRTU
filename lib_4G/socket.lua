@@ -14,7 +14,7 @@ local SENDSIZE = 11200
 -- 缓冲区最大下标
 local INDEX_MAX = 256
 -- 是否有socket正处在链接
-local socketsConnected = false
+local socketsConnected = 0
 --- SOCKET 是否有可用
 -- @return 可用true,不可用false
 socket.isReady = link.isReady
@@ -177,9 +177,13 @@ function mt:connect(address, port, timeout)
         return false
     end
     log.info("socket:connect: connect ok")
-    self.connected = true
-    socketsConnected = self.connected or socketsConnected
-    sys.publish("SOCKET_ACTIVE", socketsConnected)
+    
+    if not self.connected then
+        self.connected = true
+        socketsConnected = socketsConnected+1
+        sys.publish("SOCKET_ACTIVE", socketsConnected>0)
+    end
+    
     return true, self.id
 end
 
@@ -367,7 +371,7 @@ function mt:close()
     --if self.connected then
     log.info("socket:sock_close", self.id)
     local result, reason
-    self.connected = false
+    
     if self.id then
         socketcore.sock_close(self.id)
         self.wait = "SOCKET_CLOSE"
@@ -376,8 +380,13 @@ function mt:close()
             if reason == "RESPONSE" then break end
         end
     end
-    socketsConnected = self.connected or socketsConnected
-    sys.publish("SOCKET_ACTIVE", socketsConnected)
+    if self.connected then
+        self.connected = false
+        if socketsConnected>0 then
+            socketsConnected = socketsConnected-1
+        end
+        sys.publish("SOCKET_ACTIVE", socketsConnected>0)
+    end
     --end
     if self.id ~= nil then
         sockets[self.id] = nil
@@ -416,14 +425,20 @@ rtos.on(rtos.MSG_SOCK_CLOSE_IND, function(msg)
         log.warn('close ind on nil socket', msg.socket_index, msg.id)
         return
     end
-    sockets[msg.socket_index].connected = false
+    if sockets[msg.socket_index].connected then
+        sockets[msg.socket_index].connected = false
+        if socketsConnected>0 then
+            socketsConnected = socketsConnected-1
+        end
+        sys.publish("SOCKET_ACTIVE", socketsConnected>0)
+    end
     sockets[msg.socket_index].error = 'CLOSED'
-    socketsConnected = sockets[msg.socket_index].connected or socketsConnected
-    sys.publish("SOCKET_ACTIVE", socketsConnected)
+    
     --[[
     if type(socketcore.sock_destroy) == "function" then
         socketcore.sock_destroy(msg.socket_index)
     end]]
+    sys.publish("LIB_SOCKET_CLOSE_IND", sockets[msg.socket_index].ssl, sockets[msg.socket_index].protocol, sockets[msg.socket_index].address, sockets[msg.socket_index].port)
     coroutine.resume(sockets[msg.socket_index].co, false, "CLOSED")
 end)
 rtos.on(rtos.MSG_SOCK_RECV_IND, function(msg)
@@ -461,7 +476,24 @@ function setTcpResendPara(retryCnt, retryMaxTimeout)
     ril.request("AT+TCPUSERPARAM=6," .. (retryCnt or 4) .. ",7200," .. (retryMaxTimeout or 16))
 end
 
--- setTcpResendPara(1, 16)
+--- 设置域名解析参数
+-- 注意：0027以及之后的core版本才支持此功能
+-- @number[opt=4] retryCnt，重传次数；取值范围1到8
+-- @number[opt=4] retryTimeoutMulti，重传超时时间倍数，取值范围1到5
+--                第n次重传超时时间的计算方式为：第n次的重传超时基数*retryTimeoutMulti，单位为秒
+--                重传超时基数表为{1, 1, 2, 4, 4, 4, 4, 4}
+--                第1次重传超时时间为：1*retryTimeoutMulti 秒
+--                第2次重传超时时间为：1*retryTimeoutMulti 秒
+--                第3次重传超时时间为：2*retryTimeoutMulti 秒
+--                ...........................................
+--                第8次重传超时时间为：8*retryTimeoutMulti 秒
+-- @return nil
+-- @usage
+-- socket.setDnsParsePara(8,5)
+function setDnsParsePara(retryCnt, retryTimeoutMulti)
+    ril.request("AT*DNSTMOUT="..(retryCnt or 4)..","..(retryTimeoutMulti or 4))
+end
+
 --- 打印所有socket的状态
 -- @return 无
 -- @usage socket.printStatus()
@@ -472,3 +504,6 @@ function printStatus()
         end
     end
 end
+
+--setDnsParsePara(4,4)
+--setTcpResendPara(1,16)

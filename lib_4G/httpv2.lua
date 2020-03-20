@@ -52,9 +52,7 @@ function request(method, url, timeout, params, data, ctype, basic, headers, cert
             ['Accept'] = '*/*',
             ['Accept-Language'] = 'zh-CN,zh,cn',
             ['Content-Type'] = 'application/x-www-form-urlencoded',
-            ['Content-Length'] = '0',
-            ['Connection'] = 'Keep-alive',
-            ["Keep-Alive"] = 'timeout=20',
+            ['Connection'] = 'close',
         }
     end
     -- 处理url的协议头和鉴权
@@ -108,14 +106,15 @@ function request(method, url, timeout, params, data, ctype, basic, headers, cert
         return '502', 'SOCKET_CONN_ERROR'
     end
     if ctype ~= 3 then
-        str = method .. ' ' .. path .. ' HTTP/1.1\r\n' .. str .. '\r\n' .. (data and data .. "\r\n" or "")
-        -- log.info("发送的http报文:", str)
+        str = method .. ' ' .. path .. ' HTTP/1.0\r\n' .. str .. '\r\n' .. (data and data .. "\r\n" or "")
+        log.info("发送的http报文:", str)
         if not c:send(str) then
             c:close()
             return '426', 'SOCKET_SEND_ERROR'
         end
     else
-        str = method .. ' ' .. path .. ' HTTP/1.1\r\n' .. str .. '\r\n'
+        str = method .. ' ' .. path .. ' HTTP/1.0\r\n' .. str .. '\r\n'
+        log.info("发送的http报文:", str)
         if not c:send(str) then
             c:close()
             return '426', 'SOCKET_SEND_ERROR'

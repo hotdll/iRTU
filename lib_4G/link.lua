@@ -54,14 +54,26 @@ end
 -- @usage
 -- c = link.setAuthApn(2,"MYAPN","MYNAME","MYPASSWORD")
 function setAuthApn(prot,apn,user,pwd)
-    authProt,authApn,authUser,authPassword = prot or 0,apn or "",user or "",pwd or ""
-    request("AT*CGDFLT?")
-    ril.regUrc("*CGDFLT", function(data)
-        local dftApn = data:match("CGDFLT:%s*\"%w*\",\"(.-)\"")
-        if dftApn~=authApn then
-            setCgdf()
-        end
-    end)
+--[[
+    local coreVer = rtos.get_version()
+    local verNo = coreVer:match("Luat_V(%d+)_ASR1802_")
+    if verNo and tonumber(verNo)>=27 then
+        request("AT+AUTOAPN=0")
+        --0：保存并重启生效
+        --1：不保存立即生效
+        --2：保存并立即生效
+        --3：删除保存的文件
+        request('AT+CPNETAPN=2,"'..apn..'","'..user..'","'..pwd..'",'..prot)
+    else]]
+        authProt,authApn,authUser,authPassword = prot or 0,apn or "",user or "",pwd or ""
+        request("AT*CGDFLT?")
+        ril.regUrc("*CGDFLT", function(data)
+            local dftApn = data:match("CGDFLT:%s*\"%w*\",\"(.-)\"")
+            if dftApn~=authApn then
+                setCgdf()
+            end
+        end)
+    --end
 end
 
 local function Pdp_Act()

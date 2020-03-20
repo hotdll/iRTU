@@ -27,10 +27,11 @@ local function getFileBase64Len(s)
 end
 
 local function taskClient(method,protocal,auth,host,port,path,cert,head,body,timeout,cbFnc,rcvFilePath)
+    log.info("http path",path)
     while not socket.isReady() do
         if not sys.waitUntil("IP_READY_IND",timeout) then return response(nil,cbFnc,false,"network not ready") end
     end
-    
+
     --计算body长度
     local bodyLen = 0
     if body then
@@ -42,7 +43,7 @@ local function taskClient(method,protocal,auth,host,port,path,cert,head,body,tim
             end
         end
     end
-    
+
     --重构head
     local heads = head or {}
     if not heads.Host then heads["Host"] = host end
@@ -54,18 +55,18 @@ local function taskClient(method,protocal,auth,host,port,path,cert,head,body,tim
         headStr = headStr..k..": "..v.."\r\n"
     end
     headStr = headStr.."\r\n"
-    
+
     local client = socket.tcp(protocal=="https",cert)
     if not client then return response(nil,cbFnc,false,"create socket error") end
     if not client:connect(host,port) then
         return response(client,cbFnc,false,"connect fail")
     end
-    
+
     --发送请求行+请求头+string类型的body
     if not client:send(method.." "..path.." HTTP/1.1".."\r\n"..headStr..(type(body)=="string" and body or "")) then
         return response(client,cbFnc,false,"send head fail")
     end
-    
+
     --发送table类型的body
     if type(body)=="table" then
         for i=1,#body do
@@ -77,7 +78,7 @@ local function taskClient(method,protocal,auth,host,port,path,cert,head,body,tim
                 local file = io.open(body[i].file or body[i].file_base64,"rb")
                 if file then
                     while true do
-                        local dat = file:read(body[i].file and 1460 or 1095)
+                        local dat = file:read(body[i].file and 11200 or 8400)
                         if not dat then
                             io.close(file)
                             break
@@ -94,7 +95,7 @@ local function taskClient(method,protocal,auth,host,port,path,cert,head,body,tim
             end
         end
     end
-        
+
     local rcvCache,rspHead,rspBody,d1,d2,result,data,statusCode,rcvChunked,contentLen = "",{},{}
     --接收数据，解析状态行和头
     while true do
@@ -122,7 +123,7 @@ local function taskClient(method,protocal,auth,host,port,path,cert,head,body,tim
             break
         end
     end
-    
+
     --解析body
     if rcvChunked then
         local chunkSize
@@ -133,16 +134,16 @@ local function taskClient(method,protocal,auth,host,port,path,cert,head,body,tim
                 d1,d2,chunkSize = rcvCache:find("(%x+)\r\n")
                 if chunkSize then
                     chunkSize = tonumber(chunkSize,16)
-                    rcvCache = rcvCache:sub(d2+1,-1)                    
+                    rcvCache = rcvCache:sub(d2+1,-1)
                 else
                     result,data = receive(client,timeout,cbFnc,false,nil,rspHead,rcvFilePath or table.concat(rspBody))
                     if not result then return end
                     rcvCache = rcvCache..data
                 end
             end
-            
+
             --log.info("http.taskClient chunkSize",chunkSize)
-            
+
             --解析chunk data
             if chunkSize then
                 if rcvCache:len()<chunkSize+2 then
@@ -157,7 +158,7 @@ local function taskClient(method,protocal,auth,host,port,path,cert,head,body,tim
                             local file = io.open(rcvFilePath,"a+")
                             if not file then return response(client,cbFnc,false,"receive: open file error",rspHead,rcvFilePath or table.concat(rspBody)) end
                             if not file:write(chunkData) then response(client,cbFnc,false,"receive: write file error",rspHead,rcvFilePath or table.concat(rspBody)) end
-                            file:close()   
+                            file:close()
                         elseif type(rcvFilePath)=="function" then  --保存到缓冲区中
                             local userResult = rcvFilePath(data,rspHead["Content-Range"] and tonumber((rspHead["Content-Range"]):match("/(%d+)")) or contentLen,statusCode)
                             if userResult~=nil then
@@ -165,13 +166,13 @@ local function taskClient(method,protocal,auth,host,port,path,cert,head,body,tim
                             end
                         else
                             table.insert(rspBody,chunkData)
-                        end                    
+                        end
                         rcvCache = rcvCache:sub(chunkSize+3,-1)
                         chunkSize = nil
                     elseif chunkSize==0 then
                         return response(client,cbFnc,true,statusCode,rspHead,rcvFilePath or table.concat(rspBody))
                     end
-                end                
+                end
             end
         end
     else
@@ -192,7 +193,7 @@ local function taskClient(method,protocal,auth,host,port,path,cert,head,body,tim
                 end
             else
                 table.insert(rspBody,data)
-            end 
+            end
             rmnLen = rmnLen-data:len()
             if rmnLen==0 then break end
                 result,rcvCache = receive(client,timeout,cbFnc,contentLen==0x7FFFFFFF,contentLen==0x7FFFFFFF and statusCode or nil,rspHead,rcvFilePath or table.concat(rspBody))
@@ -212,7 +213,7 @@ end
 -- |----------|||-----------|-----------------|---------------------------|-------|
 -- |          |||           | hostname | port | pathname |     search     |       |
 -- |          |||           |----------|------|----------|----------------|       |
--- " http[s]  :// user:pass @ host.com : 8080   /p/a/t/h ?  query=string  # hash  " 
+-- " http[s]  :// user:pass @ host.com : 8080   /p/a/t/h ?  query=string  # hash  "
 -- |          |||           |          |      |          |                |       |
 -- |------------------------------------------------------------------------------|
 -- @table[opt=nil] cert，table或者nil类型，ssl证书，当url为https类型时，此参数才有意义。cert格式如下：
@@ -254,7 +255,7 @@ end
 --      body：string类型，如果调用request接口时传入了rcvFileName，此参数表示下载文件的完整路径；否则表示接收到的应答实体数据
 -- @string[opt=nil] rcvFileName，保存“服务器应答实体数据”的文件名，可以传入完整的文件路径，也可以传入单独的文件名，如果是文件名，http.lua会自动生成一个完整路径，通过cbFnc的参数body传出
 -- @return string rcvFilePath，如果传入了rcvFileName，则返回对应的完整路径；其余情况都返回nil
--- @usage 
+-- @usage
 -- http.request("GET","www.lua.org",nil,nil,nil,30000,cbFnc)
 -- http.request("GET","http://www.lua.org",nil,nil,nil,30000,cbFnc)
 -- http.request("GET","http://www.lua.org:80",nil,nil,nil,30000,cbFnc,"download.bin")
@@ -292,7 +293,7 @@ function request(method,url,cert,head,body,timeout,cbFnc,rcvFileName)
     offset = d2 or offset
 
     path = url:sub(offset+1,-1)
-    
+
     sys.taskInit(taskClient,method,protocal,auth or "",hostName,port,path=="" and "/" or path,cert,head,body or "",timeout or 30000,cbFnc,rcvFileName)
     if type(rcvFileName) == "string" then
         return rcvFileName

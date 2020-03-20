@@ -5,12 +5,12 @@
 -- @license MIT
 -- @copyright openLuat
 -- @release 2017.9.15
-
-require"ril"
+require "ril"
+require "pm"
 module(..., package.seeall)
 local uart_id
 local console_task
-
+pm.wake("console")
 local function read_line()
     while true do
         local s = uart.read(uart_id, "*l")
@@ -33,7 +33,7 @@ local function wait_event(event, timeout)
     if timeout then
         sys.timerStart(on_wait_event_timeout, timeout)
     end
-
+    
     while true do
         local receive_event = coroutine.yield()
         if receive_event == event then
@@ -49,7 +49,7 @@ end
 local function main_loop()
     local cache_data = ""
     local wait_event_flag
-
+    
     -- 定义执行环境，命令行下输入的脚本的print重写到命令行的write
     local execute_env = {
         print = function(...)
@@ -72,12 +72,12 @@ local function main_loop()
             wait_event_flag = "WAIT_AT_RESPONSE"
         end,
     }
-    setmetatable(execute_env, { __index = _G })
-
+    setmetatable(execute_env, {__index = _G})
+    
     -- 输出提示语
     write("\r\nWelcome to Luat Console\r\n")
     write("\r\n> ")
-
+    
     while true do
         -- 读取输入
         local new_data = read_line("*l")
@@ -94,15 +94,15 @@ local function main_loop()
             write("\n")
             -- 用xpcall执行用户输入的脚本，可以捕捉脚本的错误
             xpcall(function()
-                -- 执行用户输入的脚本
-                local f = assert(loadstring(line.." "))
-                setfenv(f, execute_env)
-                f()
+                    -- 执行用户输入的脚本
+                    local f = assert(loadstring(line .. " "))
+                    setfenv(f, execute_env)
+                    f()
             end,
-                function(err) -- 错误输出
-                    write(err .. '\r\n')
-                    write(debug.traceback())
-                end)
+            function(err)-- 错误输出
+                write(err .. '\r\n')
+                write(debug.traceback())
+            end)
             if wait_event_flag then
                 wait_event(wait_event_flag, 3000)
                 wait_event_flag = nil

@@ -668,7 +668,10 @@ end
 -- sys.taskInit(bdiotDataReg, "gz", "91k8gp4", "d046057ca2664ef6a0b785407a94e6ff", "03a1f3358a7c457a92040d3cd79526ea", "device", "l5t4chXaoFclITJQ")
 local function bdiotDevice(cid, pios, reg, convert, passon, upprot, dwprot, keepAlive, timeout, regio, schemaId, ak, sk, cleansession, qos, uid, ssl)
     local msg = bdiotDeviceReg(regio, schemaId, ak, sk)
-    if not msg then log.warn("-------------------百度天工物接入失败-----------------------", "fail") end
+    if not msg then
+        log.warn("-------------------百度天工物接入失败-----------------------", "fail")
+        return
+    end
     ssl = ssl:lower()
     local host = ssl == "tcp_ssl" and msg.sslEndpoint or msg.tcpEndpoint
     local addr, port = host:match("//(.+):(%d+)")
@@ -678,7 +681,10 @@ local function bdiotDevice(cid, pios, reg, convert, passon, upprot, dwprot, keep
 end
 local function bdiotData(cid, pios, reg, convert, passon, upprot, dwprot, keepAlive, timeout, regio, endpoint, ak, sk, principal, pk, sub, pub, cleansession, qos, uid, ssl, will)
     local msg = bdiotDataReg(regio, endpoint, ak, sk, principal, pk)
-    if not msg then log.warn("-------------------百度天工物接入失败-----------------------", "fail") end
+    if not msg then
+        log.warn("-------------------百度天工物接入失败-----------------------", "fail")
+        return
+    end
     ssl = ssl:lower()
     local host = ssl == "tcp_ssl" and msg.sslEndpoint or msg.tcpEndpoint
     local addr, port = host:match("//(.+):(%d+)")

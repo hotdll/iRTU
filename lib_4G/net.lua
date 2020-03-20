@@ -438,14 +438,14 @@ end
 -- @return string mcc,当前小区的mcc，如果还没有注册GSM网络，则返回sim卡的mcc
 -- @usage net.getMcc()
 function getMcc()
-	return cellinfo[1].mcc or sim.getMcc()
+	return cellinfo[1].mcc and string.format("%x",cellinfo[1].mcc) or sim.getMcc()
 end
 
 --- 获取当前小区的mnc
 -- @return string mcn,当前小区的mnc，如果还没有注册GSM网络，则返回sim卡的mnc
 -- @usage net.getMnc()
 function getMnc()
-	return cellinfo[1].mnc or sim.getMnc()
+	return cellinfo[1].mnc and string.format("%x",cellinfo[1].mnc) or sim.getMnc()
 end
 
 --- 获取当前位置区ID
@@ -524,10 +524,11 @@ local function rsp(cmd, success, response, intermediate)
 				--产生一个内部消息GSM_SIGNAL_REPORT_IND，表示读取到了信号强度
 				publish("GSM_SIGNAL_REPORT_IND", success, rssi)
 			end
-		elseif prefix == "+CFUN" then
-			if success then publish("FLYMODE", flyMode) end
 		elseif prefix == "+CENG" then end
 	end
+    if prefix == "+CFUN" then
+        if success then publish("FLYMODE", flyMode) end
+    end
 end
 
 --- 实时读取“当前和临近小区信息”

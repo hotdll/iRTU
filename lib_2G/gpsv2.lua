@@ -486,7 +486,7 @@ end
 -- @return number count，可见卫星的个数
 -- @usage gpsv2.getViewedSateCnt()
 function getViewedSateCnt()
-    return (tonumber(viewedGpsSateCnt) or 0) + (tonumber(viewedBdSateCnt) or 0)
+    return tonumber(viewedGpsSateCnt) or 0 + tonumber(viewedBdSateCnt) or 0
 end
 
 --- 获取定位使用的卫星个数
