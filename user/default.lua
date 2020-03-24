@@ -17,7 +17,6 @@ require "lbsLoc"
 require "socket"
 require "audio"
 require "httpv2"
-require "gpsv2"
 require "common"
 require "create"
 require "tracker"
@@ -122,33 +121,33 @@ end
 pios = is1802S and {
     pio10 = pins.setup(10, nil, pio.PULLDOWN),
     pio11 = pins.setup(11, nil, pio.PULLDOWN),
-    -- pio17 = pins.setup(17, nil, pio.PULLDOWN),
+    pio17 = pins.setup(17, nil, pio.PULLDOWN),
     pio18 = pins.setup(18, nil, pio.PULLDOWN),
-    -- pio20 = pins.setup(20, nil, pio.PULLDOWN),
+    pio20 = pins.setup(20, nil, pio.PULLDOWN),
     pio23 = pins.setup(23, nil, pio.PULLDOWN),
-    -- pio24 = pins.setup(24, nil, pio.PULLDOWN),
-    -- pio25 = pins.setup(25, nil, pio.PULLDOWN),
+    pio24 = pins.setup(24, nil, pio.PULLDOWN),
+    pio25 = pins.setup(25, nil, pio.PULLDOWN),
     pio26 = pins.setup(26, nil, pio.PULLDOWN),
     pio27 = pins.setup(27, nil, pio.PULLDOWN),
     pio28 = pins.setup(28, nil, pio.PULLDOWN),
-    -- pio29 = pins.setup(29, nil, pio.PULLDOWN),
-    -- pio30 = pins.setup(30, nil, pio.PULLDOWN),
+    pio29 = pins.setup(29, nil, pio.PULLDOWN),
+    pio30 = pins.setup(30, nil, pio.PULLDOWN),
     pio31 = pins.setup(31, nil, pio.PULLDOWN),
     pio32 = pins.setup(32, 0, pio.PULLUP), -- UART2 485 默认方向脚
     pio33 = pins.setup(33, nil, pio.PULLDOWN),
     pio34 = pins.setup(34, nil, pio.PULLDOWN),
     pio35 = pins.setup(35, nil, pio.PULLDOWN),
     pio36 = pins.setup(36, nil, pio.PULLDOWN),
-    -- pio37 = pins.setup(37, nil, pio.PULLDOWN),
-    -- pio38 = pins.setup(38, nil, pio.PULLDOWN),
-    -- pio39 = pins.setup(39, nil, pio.PULLDOWN),
-    -- pio40 = pins.setup(40, nil, pio.PULLDOWN),
-    -- pio41 = pins.setup(41, nil, pio.PULLDOWN),
-    -- pio42 = pins.setup(42, nil, pio.PULLDOWN),
+    pio37 = pins.setup(37, nil, pio.PULLDOWN),
+    pio38 = pins.setup(38, nil, pio.PULLDOWN),
+    pio39 = pins.setup(39, nil, pio.PULLDOWN),
+    pio40 = pins.setup(40, nil, pio.PULLDOWN),
+    pio41 = pins.setup(41, nil, pio.PULLDOWN),
+    pio42 = pins.setup(42, nil, pio.PULLDOWN),
     pio49 = pins.setup(49, nil, pio.PULLDOWN),
     pio50 = pins.setup(50, nil, pio.PULLDOWN),
-    -- pio51 = pins.setup(51, nil, pio.PULLDOWN),
-    -- pio52 = pins.setup(52, nil, pio.PULLDOWN),
+    -- pio51 = pins.setup(51, nil, pio.PULLDOWN), -- UART1 rxd
+    -- pio52 = pins.setup(52, nil, pio.PULLDOWN), -- uart 1 txd
     pio61 = pins.setup(61, 0, pio.PULLUP), -- UART1 485 默认方向脚
     pio62 = pins.setup(62, nil, pio.PULLDOWN),
     pio63 = pins.setup(63, nil, pio.PULLDOWN),
@@ -218,7 +217,7 @@ end
 
 -- 重置DTU
 if not dtu.pins or not dtu.pins[3] or not pios[dtu.pins[3]] then -- 这么定义是为了和之前的代码兼容
-    pins.setup(is4gLod and 68 or 29, function(msg)
+    pins.setup((is1802S and 17) or (is4gLod and 68) or 29, function(msg)
         if msg ~= cpu.INT_GPIO_POSEDGE then
             if io.exists(CONFIG) then os.remove(CONFIG) end
             if io.exists("/alikey.cnf") then os.remove("/alikey.cnf") end

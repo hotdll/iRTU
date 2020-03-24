@@ -100,6 +100,7 @@ local function userapi(str, pios)
     local t = str:match("(.-)\r?\n") and str:match("(.-)\r?\n"):split(',') or str:split(',')
     local rrpc = table.remove(t, 1)
     local reqcmd = table.remove(t, 1)
+    log.warn("user api:", rrpc, reqcmd)
     if default.cmd[rrpc] and default.cmd[rrpc][reqcmd] then
         return default.cmd[rrpc][reqcmd](t)
     else
@@ -117,7 +118,7 @@ local function tcpTask(cid, pios, reg, convert, passon, upprot, dwprot, prot, pi
         local idx = 0
         if not socket.isReady() and not sys.waitUntil("IP_READY_IND", rstTim) then sys.restart("网络初始化失败!") end
         local c = prot == "TCP" and socket.tcp(ssl and ssl:lower() == "ssl") or socket.udp()
-        while not c:connect(addr, port) do sys.wait((2 ^ idx) * 1000)idx = 2 ^ idx > 126320 and 0 or idx + 1 end
+        while not c:connect(addr, port) do sys.wait((2 ^ idx) * 1000)idx = idx > 9 and 0 or idx + 1 end
         -- 登陆报文
         if login or loginMsg(reg) then c:send(login or loginMsg(reg)) end
         interval[uid], samptime[uid] = tonumber(gap) or 0, tonumber(report) or 0
@@ -126,7 +127,7 @@ local function tcpTask(cid, pios, reg, convert, passon, upprot, dwprot, prot, pi
             local result, data, param = c:recv(timeout * 1000, "NET_SENT_RDY_" .. (passon and cid or uid))
             if result then
                 -- 这里执行用户自定义的指令
-                if data:sub(1, 5) == "rrpc," then
+                if data:sub(1, 5) == "rrpc," or data:sub(1, 7) == "config," then
                     local res, msg = pcall(userapi, data, pios)
                     if not res then log.error("远程查询的API错误:", msg) end
                     if convert == 0 and upprotFnc then -- 转换为用户自定义报文
@@ -138,8 +139,11 @@ local function tcpTask(cid, pios, reg, convert, passon, upprot, dwprot, prot, pi
                     sys.publish("NET_RECV_WAIT_" .. uid, uid, (data:fromHex()))
                 elseif convert == 0 and dwprotFnc then -- 转换用户自定义报文
                     local res, msg = pcall(dwprotFnc, data)
-                    if not res then log.error("数据流模版错误:", msg) end
-                    sys.publish("NET_RECV_WAIT_" .. uid, uid, res and msg or data)
+                    if not res or not msg then
+                        log.error("数据流模版错误:", msg)
+                    else
+                        sys.publish("NET_RECV_WAIT_" .. uid, uid, res and msg or data)
+                    end
                 else -- 默认不转换
                     sys.publish("NET_RECV_WAIT_" .. uid, uid, data)
                 end
@@ -148,8 +152,11 @@ local function tcpTask(cid, pios, reg, convert, passon, upprot, dwprot, prot, pi
                     if not c:send((param:toHex())) then if passon then sys.publish("UART_SENT_RDY_" .. uid, uid, "SEND_ERROR\r\n") end break end
                 elseif convert == 0 and upprotFnc then -- 转换为用户自定义报文
                     local res, msg = pcall(upprotFnc, param)
-                    if not res then log.error("数据流模版错误:", msg) end
-                    if not c:send(res and msg or param) then if passon then sys.publish("UART_SENT_RDY_" .. uid, uid, "SEND_ERROR\r\n") end break end
+                    if not res or not msg then
+                        log.error("数据流模版错误:", msg)
+                    else
+                        if not c:send(res and msg or param) then if passon then sys.publish("UART_SENT_RDY_" .. uid, uid, "SEND_ERROR\r\n") end break end
+                    end
                 else -- 默认不转换
                     if not c:send(param) then if passon then sys.publish("UART_SENT_RDY_" .. uid, uid, "SEND_ERROR\r\n") end break end
                 end
@@ -212,7 +219,7 @@ local function mqttTask(cid, pios, reg, convert, passon, upprot, dwprot, keepAli
         local messageId, idx = false, 0
         if not socket.isReady() and not sys.waitUntil("IP_READY_IND", rstTim) then sys.restart("网络初始化失败!") end
         local mqttc = mqtt.client(clientID, keepAlive, conver(usr), conver(pwd), cleansession, will, "3.1.1")
-        while not mqttc:connect(addr, port, ssl == "tcp_ssl" and ssl or nil, cert) do sys.wait((2 ^ idx) * 1000)idx = 2 ^ idx > 126320 and 0 or idx + 1 end
+        while not mqttc:connect(addr, port, ssl == "tcp_ssl" and ssl or nil, cert) do sys.wait((2 ^ idx) * 1000)idx = idx > 9 and 0 or idx + 1 end
         -- 初始化订阅主题
         if mqttc:subscribe(sub, qos) then
             if loginMsg(reg) then mqttc:publish(pub[1], loginMsg(reg), tonumber(pub[2]) or qos, retain) end
@@ -223,7 +230,7 @@ local function mqttTask(cid, pios, reg, convert, passon, upprot, dwprot, keepAli
                     log.info("订阅的消息:", packet and packet.topic)
                     messageId = packet.topic:match(".+/rrpc/request/(%d+)")
                     -- 这里执行用户自定义的指令
-                    if packet.payload:sub(1, 5) == "rrpc," then
+                    if packet.payload:sub(1, 5) == "rrpc," or packet.payload:sub(1, 7) == "config," then
                         local res, msg = pcall(userapi, packet.payload, pios)
                         if not res then log.error("远程查询的API错误:", msg) end
                         if convert == 0 and upprotFnc then -- 转换为用户自定义报文
@@ -235,8 +242,11 @@ local function mqttTask(cid, pios, reg, convert, passon, upprot, dwprot, keepAli
                         sys.publish("UART_SENT_RDY_" .. uid, uid, (packet.payload:fromHex()))
                     elseif convert == 0 and dwprotFnc then -- 转换用户自定义报文
                         local res, msg = pcall(dwprotFnc, packet.payload)
-                        if not res then log.error("数据流模版错误:", msg) end
-                        sys.publish("UART_SENT_RDY_" .. uid, uid, res and msg or packet.payload)
+                        if not res or not msg then
+                            log.error("数据流模版错误:", msg)
+                        else
+                            sys.publish("UART_SENT_RDY_" .. uid, uid, res and msg or packet.payload)
+                        end
                     else -- 默认不转换
                         sys.publish("UART_SENT_RDY_" .. uid, uid, packet.payload)
                     end
@@ -248,11 +258,14 @@ local function mqttTask(cid, pios, reg, convert, passon, upprot, dwprot, keepAli
                         if not mqttc:publish(pub[1], (param:toHex()), tonumber(pub[2]) or qos, retain) then if passon then sys.publish("UART_SENT_RDY_" .. uid, uid, "SEND_ERROR\r\n") end break end
                     elseif convert == 0 and upprotFnc then -- 转换为用户自定义报文
                         local res, msg, index = pcall(upprotFnc, param)
-                        if not res then log.error("数据流模版错误:", msg) end
-                        index = tonumber(index) or 1
-                        local pub_topic = (pub[index]:sub(-1, -1) == "+" and messageId) and pub[index]:sub(1, -2) .. messageId or pub[index]
-                        log.info("-----发布的主题:", pub_topic)
-                        if not mqttc:publish(pub_topic, res and msg or param, tonumber(pub[index + 1]) or qos, retain) then if passon then sys.publish("UART_SENT_RDY_" .. uid, uid, "SEND_ERROR\r\n") end break end
+                        if not res or not msg then
+                            log.error("数据流模版错误:", msg)
+                        else
+                            index = tonumber(index) or 1
+                            local pub_topic = (pub[index]:sub(-1, -1) == "+" and messageId) and pub[index]:sub(1, -2) .. messageId or pub[index]
+                            log.info("-----发布的主题:", pub_topic)
+                            if not mqttc:publish(pub_topic, res and msg or param, tonumber(pub[index + 1]) or qos, retain) then if passon then sys.publish("UART_SENT_RDY_" .. uid, uid, "SEND_ERROR\r\n") end break end
+                        end
                     else
                         local pub_topic = (pub[1]:sub(-1, -1) == "+" and messageId) and pub[1]:sub(1, -2) .. messageId or pub[1]
                         log.info("-----发布的主题:", pub_topic)
@@ -351,7 +364,7 @@ local function oneNet_mqtt(cid, pios, reg, convert, passon, upprot, dwprot, keep
         local idx, rsp = 0, false
         if not socket.isReady() and not sys.waitUntil("IP_READY_IND", rstTim) then sys.restart("网络初始化失败!") end
         local mqttc = mqtt.client(dat.data.device_id, keepAlive, pid, dat.data.key, cleanSession)
-        while not mqttc:connect(addr, port) do sys.wait((2 ^ idx) * 1000)idx = 2 ^ idx > 126320 and 0 or idx + 1 end
+        while not mqttc:connect(addr, port) do sys.wait((2 ^ idx) * 1000)idx = idx > 9 and 0 or idx + 1 end
         if mqttc:subscribe("$creq/#", qos) then
             while true do
                 datalink = true
@@ -360,7 +373,7 @@ local function oneNet_mqtt(cid, pios, reg, convert, passon, upprot, dwprot, keep
                 if r then
                     rsp = packet.topic:match("$creq/(%g+)")
                     -- 主题类型-rrpc请求
-                    if packet.payload:sub(1, 5) == "rrpc," then
+                    if packet.payload:sub(1, 5) == "rrpc," or packet.payload:sub(1, 7) == "config," then
                         local res, msg = pcall(userapi, packet.payload, pios)
                         if not res then log.error("远程查询的API错误:", msg) end
                         if convert == 0 and upprotFnc then -- 转换为用户自定义报文
@@ -375,8 +388,11 @@ local function oneNet_mqtt(cid, pios, reg, convert, passon, upprot, dwprot, keep
                             sys.publish("UART_SENT_RDY_" .. uid, uid, (packet.payload:fromHex()))
                         elseif convert == 0 and dwprotFnc then -- 转换用户自定义报文
                             local res, msg = pcall(dwprotFnc, packet.payload)
-                            if not res then log.error("数据流模版错误:", msg) end
-                            sys.publish("UART_SENT_RDY_" .. uid, uid, res and msg or packet.payload)
+                            if not res or not msg then
+                                log.error("数据流模版错误:", msg)
+                            else
+                                sys.publish("UART_SENT_RDY_" .. uid, uid, res and msg or packet.payload)
+                            end
                         else
                             sys.publish("UART_SENT_RDY_" .. uid, uid, packet.payload)
                         end
@@ -390,9 +406,12 @@ local function oneNet_mqtt(cid, pios, reg, convert, passon, upprot, dwprot, keep
                         if not mqttc:publish(rsp and "$crsp/" .. rsp or "$dp", (param:toHex()), qos, retain) then if passon then sys.publish("UART_SENT_RDY_" .. uid, uid, "SEND_ERROR\r\n") end break end
                     elseif convert == 0 and upprotFnc then -- 转换为用户自定义报文
                         local res, msg = pcall(upprotFnc, param)
-                        if not res then log.error("数据流模版错误:", msg) end
-                        if msg then msg = pack.pack("b>HA", ptype, #msg, msg) end
-                        if not mqttc:publish(rsp and "$crsp/" .. rsp or "$dp", msg, qos, retain) then if passon then sys.publish("UART_SENT_RDY_" .. uid, uid, "SEND_ERROR\r\n") end break end
+                        if not res or not msg then
+                            log.error("数据流模版错误:", msg)
+                        else
+                            if msg then msg = pack.pack("b>HA", ptype, #msg, msg) end
+                            if not mqttc:publish(rsp and "$crsp/" .. rsp or "$dp", msg, qos, retain) then if passon then sys.publish("UART_SENT_RDY_" .. uid, uid, "SEND_ERROR\r\n") end break end
+                        end
                     else -- 不转换报文
                         if param then param = pack.pack("b>HA", ptype, #param, param) end
                         if not mqttc:publish(rsp and "$crsp/" .. rsp or "$dp", param, qos, retain) then if passon then sys.publish("UART_SENT_RDY_" .. uid, uid, "SEND_ERROR\r\n") end break end
@@ -790,7 +809,7 @@ function connect(pios, conf, reg, convert, passon, upprot, dwprot)
                             msg = msg:toHex()
                         elseif convert == 0 and upprotFnc then -- 转换为用户自定义报文
                             local res, dat = pcall(upprotFnc, msg)
-                            if not res then log.error("数据流模版错误:", msg) end
+                            if not res or not msg then log.error("数据流模版错误:", msg) end
                             msg = res and dat or msg
                         end
                         if passon then sys.publish("UART_SENT_RDY_" .. uid, uid, "SEND_OK\r\n") end
@@ -806,9 +825,12 @@ function connect(pios, conf, reg, convert, passon, upprot, dwprot)
                             sys.publish("NET_RECV_WAIT_" .. uid, uid, str)
                         elseif convert == 0 and dwprotFnc then -- 转换用户自定义报文
                             local res, code, head, body = pcall(dwprotFnc, code, head, body)
-                            if not res then log.error("数据流模版错误:", msg) end
-                            local str = (tonumber(iscode) ~= 1 and code .. "\r\n" or "") .. (tonumber(ishead) ~= 1 and headstr or "") ~= 1 .. (tonumber(isbody) ~= 1 and body or "")
-                            sys.publish("NET_RECV_WAIT_" .. uid, uid, res and str or code)
+                            if not res or not msg then
+                                log.error("数据流模版错误:", msg)
+                            else
+                                local str = (tonumber(iscode) ~= 1 and code .. "\r\n" or "") .. (tonumber(ishead) ~= 1 and headstr or "") ~= 1 .. (tonumber(isbody) ~= 1 and body or "")
+                                sys.publish("NET_RECV_WAIT_" .. uid, uid, res and str or code)
+                            end
                         else -- 默认不转换
                             sys.publish("NET_RECV_WAIT_" .. uid, uid, (tonumber(iscode) ~= 1 and code .. "\r\n" or "") .. (tonumber(ishead) ~= 1 and headstr or "") .. (tonumber(isbody) ~= 1 and body or ""))
                         end
