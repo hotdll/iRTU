@@ -23,9 +23,11 @@ require "tracker"
 module(..., package.seeall)
 
 -- 判断模块类型
-local is4gLod = rtos.get_version():upper():find("ASR1802")
-local is1802S = rtos.get_version():upper():find("ASR1802S")
-local isTTS = rtos.get_version():upper():find("TTS") or rtos.get_version():upper():find("8955F")
+local ver = rtos.get_version():upper()
+local is4gLod = ver:find("ASR1802")
+local is1802S = ver:find("ASR1802S")
+local is8910 = ver:find("8910")
+local isTTS = ver:find("TTS") or ver:find("8955F")
 -- 用户的配置参数
 local CONFIG = "/CONFIG.cnf"
 -- 串口缓冲区最大值
@@ -76,14 +78,6 @@ local dtu = {
     },
     task = {}, -- 用户自定义任务列表
 }
-
--- 4G lib暂时没有cc库
-if not is4gLod then
-    require "cc"
-    pmd.ldoset(7, pmd.LDO_VLCD)
-    pmd.ldoset(7, pmd.LDO_VMMC)
-end
-
 -- 获取参数版本
 io.getParamVer = function()
     return dtu.param_ver
@@ -118,98 +112,135 @@ if io.exists(CONFIG) then
 end
 ---------------------------------------------------------- 用户控制 GPIO 配置 ----------------------------------------------------------
 -- 用户可用IO列表
-pios = is1802S and {
-    pio10 = pins.setup(10, nil, pio.PULLDOWN),
-    pio11 = pins.setup(11, nil, pio.PULLDOWN),
-    pio17 = pins.setup(17, nil, pio.PULLDOWN),
-    pio18 = pins.setup(18, nil, pio.PULLDOWN),
-    pio20 = pins.setup(20, nil, pio.PULLDOWN),
-    pio23 = pins.setup(23, nil, pio.PULLDOWN),
-    pio24 = pins.setup(24, nil, pio.PULLDOWN),
-    pio25 = pins.setup(25, nil, pio.PULLDOWN),
-    pio26 = pins.setup(26, nil, pio.PULLDOWN),
-    pio27 = pins.setup(27, nil, pio.PULLDOWN),
-    pio28 = pins.setup(28, nil, pio.PULLDOWN),
-    pio29 = pins.setup(29, nil, pio.PULLDOWN),
-    pio30 = pins.setup(30, nil, pio.PULLDOWN),
-    pio31 = pins.setup(31, nil, pio.PULLDOWN),
-    pio32 = pins.setup(32, 0, pio.PULLUP), -- UART2 485 默认方向脚
-    pio33 = pins.setup(33, nil, pio.PULLDOWN),
-    pio34 = pins.setup(34, nil, pio.PULLDOWN),
-    pio35 = pins.setup(35, nil, pio.PULLDOWN),
-    pio36 = pins.setup(36, nil, pio.PULLDOWN),
-    pio37 = pins.setup(37, nil, pio.PULLDOWN),
-    pio38 = pins.setup(38, nil, pio.PULLDOWN),
-    pio39 = pins.setup(39, nil, pio.PULLDOWN),
-    pio40 = pins.setup(40, nil, pio.PULLDOWN),
-    pio41 = pins.setup(41, nil, pio.PULLDOWN),
-    pio42 = pins.setup(42, nil, pio.PULLDOWN),
-    pio49 = pins.setup(49, nil, pio.PULLDOWN),
-    pio50 = pins.setup(50, nil, pio.PULLDOWN),
-    -- pio51 = pins.setup(51, nil, pio.PULLDOWN), -- UART1 rxd
-    -- pio52 = pins.setup(52, nil, pio.PULLDOWN), -- uart 1 txd
-    pio61 = pins.setup(61, 0, pio.PULLUP), -- UART1 485 默认方向脚
-    pio62 = pins.setup(62, nil, pio.PULLDOWN),
-    pio63 = pins.setup(63, nil, pio.PULLDOWN),
-    pio64 = pins.setup(64, 0, pio.PULLUP), -- NETLED
-    pio65 = pins.setup(65, nil, pio.PULLDOWN),
--- pio66 = pins.setup(66, nil, pio.PULLDOWN),
-} or (is4gLod and {
-    pio23 = pins.setup(23, 0, pio.PULLUP), -- 默认UART1的485方向控制脚
-    pio26 = pins.setup(26, nil, pio.PULLDOWN),
-    pio27 = pins.setup(27, nil, pio.PULLDOWN),
-    pio28 = pins.setup(28, nil, pio.PULLDOWN),
-    pio33 = pins.setup(33, nil, pio.PULLDOWN),
-    pio34 = pins.setup(34, nil, pio.PULLDOWN),
-    pio35 = pins.setup(35, nil, pio.PULLDOWN),
-    pio36 = pins.setup(36, nil, pio.PULLDOWN),
-    pio55 = pins.setup(55, nil, pio.PULLDOWN),
-    pio56 = pins.setup(56, nil, pio.PULLDOWN),
-    pio59 = pins.setup(59, 0, pio.PULLUP), -- 默认UART2的485方向控制脚
-    pio62 = pins.setup(62, nil, pio.PULLDOWN),
-    pio63 = pins.setup(63, nil, pio.PULLDOWN),
-    pio64 = pins.setup(64, nil, pio.PULLDOWN), -- NETLED
-    pio65 = pins.setup(65, nil, pio.PULLDOWN), -- NETREADY
-    pio67 = pins.setup(67, nil, pio.PULLDOWN),
-    pio68 = pins.setup(68, nil, pio.PULLDOWN), -- RSTCNF
-    pio69 = pins.setup(69, nil, pio.PULLDOWN),
-    pio70 = pins.setup(70, nil, pio.PULLDOWN),
-    pio71 = pins.setup(71, nil, pio.PULLDOWN),
-    pio72 = pins.setup(72, nil, pio.PULLDOWN),
-    pio73 = pins.setup(73, nil, pio.PULLDOWN),
-    pio74 = pins.setup(74, nil, pio.PULLDOWN),
-    pio75 = pins.setup(75, nil, pio.PULLDOWN),
-    pio76 = pins.setup(76, nil, pio.PULLDOWN),
-    pio77 = pins.setup(77, nil, pio.PULLDOWN),
-    pio78 = pins.setup(78, nil, pio.PULLDOWN),
-    pio79 = pins.setup(79, nil, pio.PULLDOWN),
-    pio80 = pins.setup(80, nil, pio.PULLDOWN),
-    pio81 = pins.setup(81, nil, pio.PULLDOWN),
-} or {
-    pio2 = pins.setup(pio.P0_2, nil, pio.PULLDOWN), -- 默认UART1的485方向控制脚
-    pio3 = pins.setup(pio.P0_3, nil, pio.PULLDOWN), -- 默认netready信号
-    pio6 = pins.setup(pio.P0_6, nil, pio.PULLDOWN), -- 默认UART2的485方向控制脚
-    pio7 = pins.setup(pio.P0_7, nil, pio.PULLDOWN),
-    pio8 = pins.setup(pio.P0_8, nil, pio.PULLDOWN),
-    pio9 = pins.setup(pio.P0_9, nil, pio.PULLDOWN),
-    pio10 = pins.setup(pio.P0_10, nil, pio.PULLDOWN),
-    pio11 = pins.setup(pio.P0_11, nil, pio.PULLDOWN),
-    pio12 = pins.setup(pio.P0_12, nil, pio.PULLDOWN),
-    pio13 = pins.setup(pio.P0_13, nil, pio.PULLDOWN),
-    pio14 = pins.setup(pio.P0_14, nil, pio.PULLDOWN),
-    pio15 = pins.setup(pio.P0_15, nil, pio.PULLDOWN),
-    pio16 = pins.setup(pio.P0_16, nil, pio.PULLDOWN),
-    pio17 = pins.setup(pio.P0_17, nil, pio.PULLDOWN),
-    pio18 = pins.setup(pio.P0_18, nil, pio.PULLDOWN),
-    pio28 = pins.setup(pio.P0_28, nil, pio.PULLDOWN), -- 默认202 NETLED
-    pio29 = pins.setup(pio.P0_29, nil, pio.PULLDOWN), -- 默认恢复默认值
-    pio33 = pins.setup(pio.P1_1, nil, pio.PULLDOWN), -- 默认800 NETLED
-    pio34 = pins.setup(pio.P1_2, nil, pio.PULLDOWN),
-})
+if is1802S then
+    pmd.ldoset(7, pmd.VLDO6)
+    pios = {
+        pio10 = pins.setup(10, nil, pio.PULLDOWN),
+        pio11 = pins.setup(11, nil, pio.PULLDOWN),
+        pio17 = pins.setup(17, nil, pio.PULLDOWN),
+        pio18 = pins.setup(18, nil, pio.PULLDOWN),
+        pio20 = pins.setup(20, nil, pio.PULLDOWN),
+        pio23 = pins.setup(23, nil, pio.PULLDOWN),
+        pio24 = pins.setup(24, nil, pio.PULLDOWN),
+        pio25 = pins.setup(25, nil, pio.PULLDOWN),
+        pio26 = pins.setup(26, nil, pio.PULLDOWN),
+        pio27 = pins.setup(27, nil, pio.PULLDOWN),
+        pio28 = pins.setup(28, nil, pio.PULLDOWN),
+        -- pio29 = pins.setup(29, nil, pio.PULLDOWN),-- UART2 - RXD
+        -- pio30 = pins.setup(30, nil, pio.PULLDOWN),-- UART2 - TXD
+        pio31 = pins.setup(31, nil, pio.PULLDOWN),
+        pio32 = pins.setup(32, 0, pio.PULLUP), -- UART2 485 默认方向脚
+        pio33 = pins.setup(33, nil, pio.PULLDOWN),
+        pio34 = pins.setup(34, nil, pio.PULLDOWN),
+        pio35 = pins.setup(35, nil, pio.PULLDOWN),
+        pio36 = pins.setup(36, nil, pio.PULLDOWN),
+        pio37 = pins.setup(37, nil, pio.PULLDOWN),
+        pio38 = pins.setup(38, nil, pio.PULLDOWN),
+        pio39 = pins.setup(39, nil, pio.PULLDOWN),
+        pio40 = pins.setup(40, nil, pio.PULLDOWN),
+        pio41 = pins.setup(41, nil, pio.PULLDOWN),
+        pio42 = pins.setup(42, nil, pio.PULLDOWN),
+        pio49 = pins.setup(49, nil, pio.PULLDOWN),
+        pio50 = pins.setup(50, nil, pio.PULLDOWN),
+        -- pio51 = pins.setup(51, nil, pio.PULLDOWN), -- UART1 rxd
+        -- pio52 = pins.setup(52, nil, pio.PULLDOWN), -- uart 1 txd
+        pio61 = pins.setup(61, 0, pio.PULLUP), -- UART1 485 默认方向脚
+        pio62 = pins.setup(62, nil, pio.PULLDOWN),
+        pio63 = pins.setup(63, nil, pio.PULLDOWN),
+        pio64 = pins.setup(64, 0, pio.PULLUP), -- NETLED
+        pio65 = pins.setup(65, nil, pio.PULLDOWN),
+    -- pio66 = pins.setup(66, nil, pio.PULLDOWN),
+    }
+elseif is4gLod then
+    pmd.ldoset(7, pmd.VLDO6)
+    pios = {
+        pio23 = pins.setup(23, 0, pio.PULLUP), -- 默认UART1的485方向控制脚
+        pio26 = pins.setup(26, nil, pio.PULLDOWN),
+        pio27 = pins.setup(27, nil, pio.PULLDOWN),
+        pio28 = pins.setup(28, nil, pio.PULLDOWN),
+        pio33 = pins.setup(33, nil, pio.PULLDOWN),
+        pio34 = pins.setup(34, nil, pio.PULLDOWN),
+        pio35 = pins.setup(35, nil, pio.PULLDOWN),
+        pio36 = pins.setup(36, nil, pio.PULLDOWN),
+        pio55 = pins.setup(55, nil, pio.PULLDOWN),
+        pio56 = pins.setup(56, nil, pio.PULLDOWN),
+        pio59 = pins.setup(59, 0, pio.PULLUP), -- 默认UART2的485方向控制脚
+        pio62 = pins.setup(62, nil, pio.PULLDOWN),
+        pio63 = pins.setup(63, nil, pio.PULLDOWN),
+        pio64 = pins.setup(64, nil, pio.PULLDOWN), -- NETLED
+        pio65 = pins.setup(65, nil, pio.PULLDOWN), -- NETREADY
+        pio67 = pins.setup(67, nil, pio.PULLDOWN),
+        pio68 = pins.setup(68, nil, pio.PULLDOWN), -- RSTCNF
+        pio69 = pins.setup(69, nil, pio.PULLDOWN),
+        pio70 = pins.setup(70, nil, pio.PULLDOWN),
+        pio71 = pins.setup(71, nil, pio.PULLDOWN),
+        pio72 = pins.setup(72, nil, pio.PULLDOWN),
+        pio73 = pins.setup(73, nil, pio.PULLDOWN),
+        pio74 = pins.setup(74, nil, pio.PULLDOWN),
+        pio75 = pins.setup(75, nil, pio.PULLDOWN),
+        pio76 = pins.setup(76, nil, pio.PULLDOWN),
+        pio77 = pins.setup(77, nil, pio.PULLDOWN),
+        pio78 = pins.setup(78, nil, pio.PULLDOWN),
+        pio79 = pins.setup(79, nil, pio.PULLDOWN),
+        pio80 = pins.setup(80, nil, pio.PULLDOWN),
+        pio81 = pins.setup(81, nil, pio.PULLDOWN),
+    }
+elseif is8910 then
+    pmd.ldoset(15, pmd.LDO_VLCD)
+    pmd.ldoset(15, pmd.LDO_VMMC)
+    pios = {
+        pio0 = pins.setup(0, nil, pio.PULLDOWN),
+        pio2 = pins.setup(2, nil, pio.PULLDOWN),
+        pio3 = pins.setup(3, nil, pio.PULLDOWN),
+        -- pio6 = pins.setup(6, nil, pio.PULLDOWN),
+        pio7 = pins.setup(7, nil, pio.PULLDOWN),
+        pio9 = pins.setup(9, nil, pio.PULLDOWN),
+        pio10 = pins.setup(10, nil, pio.PULLDOWN),
+        pio11 = pins.setup(11, nil, pio.PULLDOWN),
+        pio12 = pins.setup(12, nil, pio.PULLDOWN),
+        pio13 = pins.setup(13, nil, pio.PULLDOWN),
+        pio14 = pins.setup(14, nil, pio.PULLDOWN),
+        pio15 = pins.setup(15, nil, pio.PULLDOWN),
+        pio16 = pins.setup(16, nil, pio.PULLDOWN),
+        pio17 = pins.setup(17, nil, pio.PULLDOWN),
+        pio18 = pins.setup(18, nil, pio.PULLDOWN),
+        pio19 = pins.setup(19, nil, pio.PULLDOWN),
+        pio24 = pins.setup(24, nil, pio.PULLDOWN),
+        pio25 = pins.setup(25, nil, pio.PULLDOWN),
+        pio26 = pins.setup(26, nil, pio.PULLDOWN),
+        pio27 = pins.setup(27, nil, pio.PULLDOWN),
+        pio28 = pins.setup(28, nil, pio.PULLDOWN),
+    }
+else
+    require "cc"
+    pmd.ldoset(7, pmd.LDO_VLCD)
+    pmd.ldoset(7, pmd.LDO_VMMC)
+    pios = {
+        pio2 = pins.setup(2, nil, pio.PULLDOWN), -- 默认UART1的485方向控制脚
+        pio3 = pins.setup(3, nil, pio.PULLDOWN), -- 默认netready信号
+        pio6 = pins.setup(6, nil, pio.PULLDOWN), -- 默认UART2的485方向控制脚
+        pio7 = pins.setup(7, nil, pio.PULLDOWN),
+        pio8 = pins.setup(8, nil, pio.PULLDOWN),
+        pio9 = pins.setup(9, nil, pio.PULLDOWN),
+        pio10 = pins.setup(10, nil, pio.PULLDOWN),
+        pio11 = pins.setup(11, nil, pio.PULLDOWN),
+        pio12 = pins.setup(12, nil, pio.PULLDOWN),
+        pio13 = pins.setup(13, nil, pio.PULLDOWN),
+        pio14 = pins.setup(14, nil, pio.PULLDOWN),
+        pio15 = pins.setup(15, nil, pio.PULLDOWN),
+        pio16 = pins.setup(16, nil, pio.PULLDOWN),
+        pio17 = pins.setup(17, nil, pio.PULLDOWN),
+        pio18 = pins.setup(18, nil, pio.PULLDOWN),
+        pio28 = pins.setup(28, nil, pio.PULLDOWN), -- 默认202 NETLED
+        pio29 = pins.setup(29, nil, pio.PULLDOWN), -- 默认恢复默认值
+        pio33 = pins.setup(33, nil, pio.PULLDOWN), -- 默认800 NETLED
+        pio34 = pins.setup(34, nil, pio.PULLDOWN),
+    }
+end
 
 -- 网络READY信号
 if not dtu.pins or not dtu.pins[2] or not pios[dtu.pins[2]] then -- 这么定义是为了和之前的代码兼容
-    netready = pins.setup(is4gLod and 65 or 3, 0)
+    netready = pins.setup((is4gLod and 65) or (is8910 and 4) or 3, 0)
 else
     netready = pins.setup(tonumber(dtu.pins[2]:sub(4, -1)), 0)
     pios[dtu.pins[2]] = nil
@@ -217,7 +248,7 @@ end
 
 -- 重置DTU
 if not dtu.pins or not dtu.pins[3] or not pios[dtu.pins[3]] then -- 这么定义是为了和之前的代码兼容
-    pins.setup((is1802S and 17) or (is4gLod and 68) or 29, function(msg)
+    pins.setup((is1802S or is8910 and 17) or (is4gLod and 68) or 29, function(msg)
         if msg ~= cpu.INT_GPIO_POSEDGE then
             if io.exists(CONFIG) then os.remove(CONFIG) end
             if io.exists("/alikey.cnf") then os.remove("/alikey.cnf") end
@@ -263,7 +294,7 @@ local function netled(led)
     end
 end
 if not dtu.pins or not dtu.pins[1] or not pios[dtu.pins[1]] then -- 这么定义是为了和之前的代码兼容
-    sys.taskInit(netled, is4gLod and 64 or 33)
+    sys.taskInit(netled, (is4gLod and 64) or (is8910 and 1) or 33)
 else
     sys.taskInit(netled, tonumber(dtu.pins[1]:sub(4, -1)))
     pios[dtu.pins[1]] = nil
@@ -437,7 +468,8 @@ local function read(uid)
     recvBuff[uid] = {}
     -- 串口流量统计
     flowCount[uid] = flowCount[uid] + #s
-    log.info("UART_" .. uid .. "read length:", #s)
+    -- log.info("UART_" .. uid .. "read length:", #s)
+    log.info("UART_" .. uid .. "read:", (s:toHex()))
     log.info("串口流量统计值:", flowCount[uid])
     -- 根据透传标志位判断是否解析数据
     if s:sub(1, 3) == "+++" or s:sub(1, 5):match("(.+)\r\n") == "+++" then
@@ -543,7 +575,9 @@ end
 
 -- uart 的初始化配置函数
 function uart_INIT(i, uconf)
-    uart.setup(uconf[i][1], uconf[i][2], uconf[i][3], uconf[i][4], uconf[i][5], nil, 1)
+    local id = (is8910 and i == 2) and 3 or i
+    if id == 3 then return end
+    uart.setup(id, uconf[i][2], uconf[i][3], uconf[i][4], uconf[i][5], nil, 1)
     uart.on(i, "sent", writeDone)
     uart.on(i, "receive", function(uid, length)
         table.insert(recvBuff[uid], uart.read(uid, length or 8192))
@@ -579,7 +613,6 @@ function uart_INIT(i, uconf)
         uart.set_rs485_oe(i, default["dir" .. i])
     end
 end
-
 ------------------------------------------------ 远程任务 ----------------------------------------------------------
 -- 远程自动更新参数和更新固件任务每隔24小时检查一次
 sys.taskInit(function()
