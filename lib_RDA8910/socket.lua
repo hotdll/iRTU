@@ -316,8 +316,11 @@ function mt:recv(timeout, msg, msgNoResume)
     if msg and not self.iSubscribe then
         self.iSubscribe = msg
         self.subMessage = function(data)
-            if data then table.insert(self.output, data) end
-            if self.wait == "+RECEIVE" and not self.msgNoResume then coroutine.resume(self.co, 0xAA) end
+            --if data then table.insert(self.output, data) end
+            if self.wait == "+RECEIVE" and not self.msgNoResume then
+                if data then table.insert(self.output, data) end
+                coroutine.resume(self.co, 0xAA)
+            end
         end
         sys.subscribe(msg, self.subMessage)
     end

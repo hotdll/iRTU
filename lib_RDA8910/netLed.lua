@@ -128,13 +128,13 @@ end
 
 --- 配置网络指示灯和LTE指示灯并且立即执行配置后的动作
 -- @bool flag，是否打开网络指示灯和LTE指示灯功能，true为打开，false为关闭
--- @number ledPin，控制网络指示灯闪烁的GPIO引脚，例如pio.P2_0表示GPIO64
--- @number ltePin，控制LTE指示灯闪烁的GPIO引脚，例如pio.P2_1表示GPIO65
+-- @number ledPin，控制网络指示灯闪烁的GPIO引脚，例如pio.P0_1表示GPIO1
+-- @number ltePin，控制LTE指示灯闪烁的GPIO引脚，例如pio.P0_4表示GPIO4
 -- @return nil
--- @usage setup(true,pio.P2_0,pio.P2_1)表示打开网络指示灯和LTE指示灯功能，GPIO64控制网络指示灯，GPIO65控制LTE指示灯
+-- @usage setup(true,pio.P0_1,pio.P0_4)表示打开网络指示灯和LTE指示灯功能，GPIO1控制网络指示灯，GPIO4控制LTE指示灯
 -- @usage setup(false)表示关闭网络指示灯和LTE指示灯功能
 function setup(flag,ledPin,ltePin)
-    --log.info("netLed.setup",flag,pin,ledSwitch)
+    --log.info("netLed.setup",flag,pin,ledSwitch)    
     local oldSwitch = ledSwitch
     if flag~=ledSwitch then
         ledSwitch = flag

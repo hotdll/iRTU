@@ -20,6 +20,7 @@ require "httpv2"
 require "common"
 require "create"
 require "tracker"
+require "update"
 module(..., package.seeall)
 
 -- 判断模块类型
@@ -192,7 +193,7 @@ elseif is8910 then
         pio0 = pins.setup(0, nil, pio.PULLDOWN),
         pio2 = pins.setup(2, nil, pio.PULLDOWN),
         pio3 = pins.setup(3, nil, pio.PULLDOWN),
-        pio6 = pins.setup(6, nil, pio.PULLDOWN),
+        -- pio6 = pins.setup(6, nil, pio.PULLDOWN), // 不能启用该IO，否则虚拟AT口会死掉
         pio7 = pins.setup(7, nil, pio.PULLDOWN),
         pio9 = pins.setup(9, nil, pio.PULLDOWN),
         pio10 = pins.setup(10, nil, pio.PULLDOWN),
@@ -576,6 +577,7 @@ end
 
 -- uart 的初始化配置函数
 function uart_INIT(i, uconf)
+    if (is8910 and i == 2) then return end
     uart.setup(i, uconf[i][2], uconf[i][3], uconf[i][4], uconf[i][5], nil, 1)
     uart.on(i, "sent", writeDone)
     uart.on(i, "receive", function(uid, length)
@@ -637,23 +639,39 @@ sys.taskInit(function()
         
         -- 检查是否有更新程序
         if tonumber(dtu.fota) == 1 then
-            if is4gLod and rtos.fota_start() == 0 then
-                url = "iot.openluat.com/api/site/firmware_upgrade?project_key=" .. _G.PRODUCT_KEY
-                    .. "&imei=" .. misc.getImei() .. "&device_key=" .. misc.getSn()
-                    .. "&firmware_name=" .. _G.PROJECT .. "_" .. rtos.get_version() .. "&version=" .. _G.VERSION
-                code, head, body = httpv2.request("GET", url, 30000, nil, nil, nil, nil, nil, nil, rtos.fota_process)
-                if tonumber(code) == 200 or tonumber(code) == 206 then rst = true end
-                rtos.fota_end()
-            elseif not is4gLod then
-                url = "iot.openluat.com/api/site/firmware_upgrade?project_key=" .. _G.PRODUCT_KEY
-                    .. "&imei=" .. misc.getImei() .. "&device_key=" .. misc.getSn()
-                    .. "&firmware_name=" .. _G.PROJECT .. "_" .. rtos.get_version() .. "&version=" .. _G.VERSION
-                code, head, body = httpv2.request("GET", url, 30000)
-                if tonumber(code) == 200 and body and #body > 1024 then
-                    io.writeFile("/luazip/update.bin", body)
-                    rst = true
-                end
-            end
+            log.info("----- update firmware:", "start!")
+            -- if (is4gLod) and rtos.fota_start() == 0 then
+            --     if is8910 then
+            --         local coreVer = rtos.get_version()
+            --         local coreName1, coreName2 = coreVer:match("(.-)_V%d+(_.+)")
+            --         local coreVersion = tonumber(coreVer:match(".-_V(%d+)"))
+            --         url = "iot.openluat.com/api/site/firmware_upgrade?project_key=" .. _G.PRODUCT_KEY
+            --             .. "&imei=" .. misc.getImei()
+            --             .. "&firmware_name=" .. _G.PROJECT .. "_" .. coreName1 .. coreName2 .. "&core_version=" .. coreVersion .. "&dfota=1&version=" .. _G.VERSION
+            --     else
+            --         url = "iot.openluat.com/api/site/firmware_upgrade?project_key=" .. _G.PRODUCT_KEY
+            --             .. "&imei=" .. misc.getImei() .. "&device_key=" .. misc.getSn()
+            --             .. "&firmware_name=" .. _G.PROJECT .. "_" .. rtos.get_version() .. "&version=" .. _G.VERSION
+            --     end
+            --     code, head, body = httpv2.request("GET", url, 30000, nil, nil, nil, nil, nil, nil, rtos.fota_process)
+            --     if tonumber(code) == 200 or tonumber(code) == 206 then rst = true end
+            --     rtos.fota_end()
+            -- elseif not is4gLod then
+            --     url = "iot.openluat.com/api/site/firmware_upgrade?project_key=" .. _G.PRODUCT_KEY
+            --         .. "&imei=" .. misc.getImei() .. "&device_key=" .. misc.getSn()
+            --         .. "&firmware_name=" .. _G.PROJECT .. "_" .. rtos.get_version() .. "&version=" .. _G.VERSION
+            --     code, head, body = httpv2.request("GET", url, 30000)
+            --     if tonumber(code) == 200 and body and #body > 1024 then
+            --         io.writeFile("/luazip/update.bin", body)
+            --         rst = true
+            --     end
+            -- end
+            update.request(function(res)
+                sys.publish("IRTU_UPDATE_RES", res == true)
+            end, nil, 86400000)
+            local res, val = sys.waitUntil("IRTU_UPDATE_RES")
+            rst = rst or val
+            log.info("----- update firmware:", "end!")
         end
         if rst then sys.restart("DTU Parameters or firmware are updated!") end
         ---------- 基站坐标查询 ----------
@@ -669,11 +687,6 @@ sys.taskInit(function()
     end
 end)
 
--- sys.timerLoopStart(function()
---     log.info("打印占用的内存:", _G.collectgarbage("count"))-- 打印占用的RAM
---     log.info("打印可用的空间", rtos.get_fs_free_size())-- 打印剩余FALSH，单位Byte
---     socket.printStatus()
--- end, 1000)
 local callFlag = false
 sys.subscribe("CALL_INCOMING", function(num)
     log.info("Telephone number:", num)
@@ -703,8 +716,7 @@ end)
 -- 初始化配置UART1和UART2
 local uidgps = dtu.gps and dtu.gps.fun and tonumber(dtu.gps.fun[1])
 if uidgps ~= 1 and dtu.uconf and dtu.uconf[1] and tonumber(dtu.uconf[1][1]) == 1 then uart_INIT(1, dtu.uconf) end
-if uidgps ~= 2 and dtu.uconf and dtu.uconf[2] and tonumber(dtu.uconf[2][1]) == 2 then uart_INIT(2, dtu.uconf) end
-
+--if uidgps ~= 2 and dtu.uconf and dtu.uconf[2] and tonumber(dtu.uconf[2][1]) == 2 then uart_INIT(2, dtu.uconf) end
 -- 启动GPS任务
 if uidgps then
     -- 从pios列表去掉自定义的io
@@ -800,3 +812,9 @@ if dtu.task and #dtu.task ~= 0 then
         end
     end
 end
+
+sys.timerLoopStart(function()
+    log.info("打印占用的内存:", _G.collectgarbage("count"))-- 打印占用的RAM
+    log.info("打印可用的空间", rtos.get_fs_free_size())-- 打印剩余FALSH，单位Byte
+--socket.printStatus()
+end, 10000)

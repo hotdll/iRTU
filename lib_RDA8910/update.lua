@@ -16,6 +16,7 @@ module(..., package.seeall)
 local sUpdating,sCbFnc,sUrl,sPeriod,SRedir,sLocation,fotastart
 local sProcessedLen = 0
 --local sBraekTest = 0
+local httpRspCode
 
 local function httpDownloadCbFnc(result,statusCode,head)
     log.info("update.httpDownloadCbFnc",result,statusCode,head,sCbFnc,sPeriod)
@@ -34,11 +35,14 @@ local function processOta(stepData,totalLen,statusCode)
                 --if sProcessedLen*100/totalLen==sBraekTest then return false end
                 if sProcessedLen*100/totalLen>=100 then return true end
             end
-        elseif statusCode:sub(1,1)~="3" and stepData:len()==totalLen and totalLen>0 and totalLen<=200 then
-            local msg = stepData:match("\"msg\":%s*\"(.-)\"")
-            if msg and msg:len()<=200 then
-                log.warn("update.error",common.ucs2beToUtf8((msg:gsub("\\u","")):fromHex()))
+        elseif statusCode:sub(1,1)~="3" and stepData:len()==totalLen and totalLen>0 then
+            if totalLen<=200 then
+                local msg = stepData:match("\"msg\":%s*\"(.-)\"")
+                if msg and msg:len()<=200 then
+                    log.warn("update.error",common.ucs2beToUtf8((msg:gsub("\\u","")):fromHex()))
+                end
             end
+            httpRspCode = stepData:match("\"code\":%s*(%d+)")
         end
     end
 end
@@ -54,30 +58,42 @@ function clientTask()
             --sBraekTest = sBraekTest+30
             log.info("update.http.request",sLocation,sUrl,sProcessedLen,sBraekTest,fotastart)
             if not fotastart then break end
+            local coreVer = rtos.get_version()
+            local coreName1,coreName2 = coreVer:match("(.-)_V%d+(_.+)")
+            local coreVersion = tonumber(coreVer:match(".-_V(%d+)"))
+            httpRspCode = nil
             http.request("GET",
                      sLocation or ((sUrl or "iot.openluat.com/api/site/firmware_upgrade").."?project_key=".._G.PRODUCT_KEY
-                            .."&imei="..misc.getImei().."&device_key="..misc.getSn()
-                            .."&firmware_name=".._G.PROJECT.."_"..rtos.get_version().."&version=".._G.VERSION..(sRedir and "&need_oss_url=1" or "")),
+                            .."&imei="..misc.getImei()
+                            .."&firmware_name=".._G.PROJECT.."_"..coreName1..coreName2.."&core_version="..coreVersion.."&dfota=1&version=".._G.VERSION..(sRedir and "&need_oss_url=1" or "")),
                      nil,{["Range"]="bytes="..sProcessedLen.."-"},nil,60000,httpDownloadCbFnc,processOta)
                      
             local _,result,statusCode,head = sys.waitUntil("UPDATE_DOWNLOAD")
-            log.info("update.waitUntil UPDATE_DOWNLOAD",result,statusCode)
+            log.info("update.waitUntil UPDATE_DOWNLOAD",result,statusCode,httpRspCode)
             if result then
-                log.info("update.rtos.fota_end",rtos.fota_end())
-                if statusCode=="200" or statusCode=="206" then                    
+                local needBreak                
+                if statusCode=="200" or statusCode=="206" then
+                    needBreak = true
                     if sCbFnc then
                         sCbFnc(true)
                     else
                         sys.restart("UPDATE_DOWNLOAD_SUCCESS")
                     end
                 elseif statusCode:sub(1,1)=="3" and head and head["Location"] then
-                    sUpdating,sLocation = false,head["Location"]
-                    print("update.timerStart",head["Location"])
-                    return sys.timerStart(request,2000)
+                    sLocation = head["Location"]
+                    sys.wait(2000)
+                elseif httpRspCode=="43" then
+                    log.info("update.clientTask","wait server create fota")
+                    sys.wait(30000)
                 else
                     if sCbFnc then sCbFnc(false) end
+                    needBreak = true
                 end
-                break
+                
+                if needBreak then
+                    log.info("update.rtos.fota_end",rtos.fota_end())
+                    break
+                end
             else
                 retryCnt = retryCnt+1
                 if retryCnt==30 then

@@ -11,15 +11,15 @@ module(..., package.seeall)
 --imei：IMEI
 -- calib 校准标志
 local sn, imei, calib, ver, muid
-local setSnCbFnc,setImeiCbFnc,setClkCbFnc
+local setSnCbFnc, setImeiCbFnc, setClkCbFnc
 
 local function timeReport()
     sys.publish("TIME_CLK_IND")
-    sys.timerStart(setTimeReport,2000)
+    sys.timerStart(setTimeReport, 2000)
 end
 
 function setTimeReport()
-    sys.timerStart(timeReport,(os.time()%60==0) and 50 or (60-os.time()%60)*1000)
+    sys.timerStart(timeReport, (os.time() % 60 == 0) and 50 or (60 - os.time() % 60) * 1000)
 end
 
 --[[
@@ -36,12 +36,12 @@ local function rsp(cmd, success, response, intermediate)
     local prefix = string.match(cmd, "AT(%+%u+)")
     --查询序列号
     if cmd == "AT+WISN?" then
-        result = (intermediate~="*CME ERROR: Missing SN")
+        result = (intermediate ~= "*CME ERROR: Missing SN")
         if result then
             sn = intermediate
             sys.publish('SN_READY_IND')
         end
-        if setSnCbFnc then setSnCbFnc(result) end        
+        if setSnCbFnc then setSnCbFnc(result) end
     --查询IMEI
     elseif cmd == "AT+CGSN" then
         imei = intermediate
@@ -62,7 +62,7 @@ local function rsp(cmd, success, response, intermediate)
             sys.publish('TIME_UPDATE_IND')
             setTimeReport()
         end
-        if setClkCbFnc then setClkCbFnc(getClock(),success) end
+        if setClkCbFnc then setClkCbFnc(getClock(), success) end
     elseif cmd:match("AT%+WISN=") then
         if success then
             req("AT+WISN?")
@@ -90,9 +90,9 @@ end
 -- cnFnc(time，result)，result为true表示成功，false或者nil为失败；time表示设置之后的系统时间，table类型，例如{year=2017,month=2,day=14,hour=14,min=19,sec=23}
 -- @return nil
 -- @usage misc.setClock({year=2017,month=2,day=14,hour=14,min=2,sec=58})
-function setClock(t,cbFnc)
-    if type(t) ~= "table" or (t.year-2000>38) then
-        if cbFnc then cbFnc(getClock(),false) end
+function setClock(t, cbFnc)
+    if type(t) ~= "table" or (t.year - 2000 > 38) then
+        if cbFnc then cbFnc(getClock(), false) end
         return
     end
     setClkCbFnc = cbFnc
@@ -128,7 +128,7 @@ end
 function setSn(s, cbFnc)
     if s ~= sn then
         setSnCbFnc = cbFnc
-        req("AT+WISN=\"" .. s .. "\"") 
+        req("AT+WISN=\"" .. s .. "\"")
     else
         if cbFnc then cbFnc(true) end
     end

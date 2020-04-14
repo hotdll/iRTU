@@ -136,33 +136,38 @@ end
 function analysis_cgdcont(data)
 	local tmp,loc,result
 
-	while data do
-		_,loc = string.find(data, "\r\n")
-		if loc then 
-			tmp = string.sub(data,1,loc)
-			data = string.sub(data,loc+1,-1)
-			log.info("analysis_cgdcont ",tmp,loc,data)
-		else
-			tmp = data
-			data = nil
-			log.info("analysis_cgdcont end",tmp,loc,data)
-		end 
+    while data do
+        _,loc = string.find(data, "\r\n")
+        if loc then 
+            tmp = string.sub(data,1,loc)
+            data = string.sub(data,loc+1,-1)
+            log.info("analysis_cgdcont ",tmp,loc,data)
+        else
+            tmp = data
+            data = nil
+            log.info("analysis_cgdcont end",tmp,loc,data)
+        end 
 		
-		if tmp then
-			local cid,pdptyp,apn,pdpaddr1,pdpaddr2,pdpaddr3,pdpaddr4=string.match(tmp, "(%d+),(.+),(.+),[\"\'](%d+).(%d+).(%d+).(%d+)[\"\']")
-			if not cid or not pdptyp or not apn or not pdpaddr1 or not pdpaddr2 or not pdpaddr3 or not pdpaddr4 then
-				log.info("analysis_cgdcont CGDCONT is empty")
-				result=false
-			else
-				log.info("analysis_cgdcont ",cid,pdptyp,apn,pdpaddr1,pdpaddr2,pdpaddr3,pdpaddr4)
-				return true
-			end
-		else
-			log.info("analysis_cgdcont tmp is empty")
-		end
-	end
+        if tmp then
+            local cid,pdptyp,apn,addr=string.match(tmp, "(%d+),(.+),(.+),[\"\'](.+)[\"\']")
+            if not cid or not pdptyp or not apn or not addr then
+                log.info("analysis_cgdcont CGDCONT is empty")
+                result=false
+            else
+                log.info("analysis_cgdcont ",cid,pdptyp,apn,addr)
+                if addr:match("%d+%.%d+%.%d+%.%d") then
+                    return true
+                else
+                    log.info("analysis_cgdcont CGDCONT is empty1")
+                    return false
+                end
+            end
+        else
+            log.info("analysis_cgdcont tmp is empty")
+        end
+    end
 	
-	return result
+    return result
 end
 
 function IsCidActived(cid,data)

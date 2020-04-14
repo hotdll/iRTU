@@ -29,6 +29,28 @@ local dirs = {}
 -- 执行getInputFnc()即可获得当前电平；如果是低电平，getInputFnc()返回0；如果是高电平，getInputFnc()返回1
 -- @usage getInputFnc = pins.setup(pio.P1_1),配置GPIO33，输入模式
 --执行getInputFnc()即可获得当前电平；如果是低电平，getInputFnc()返回0；如果是高电平，getInputFnc()返回1
+-- @usage
+--有些GPIO需要打开对应的ldo电压域之后，才能正常配置工作，电压域和对应的GPIO关系如下
+--pmd.ldoset(x,pmd.LDO_VSIM2) -- GPIO 29、30、31 --目前core版本还不支持
+--pmd.ldoset(x,pmd.LDO_VLCD) -- GPIO 0、1、2、3、4、6  --目前core版本，x还控制不了不同等级的电压，都是1.8V
+--pmd.ldoset(x,pmd.LDO_VMMC) -- GPIO 24、25、26、27、28
+--x=0时：关闭LDO
+--x=1时：LDO输出1.716V
+--x=2时：LDO输出1.828V
+--x=3时：LDO输出1.939V
+--x=4时：LDO输出2.051V
+--x=5时：LDO输出2.162V
+--x=6时：LDO输出2.271V
+--x=7时：LDO输出2.375V
+--x=8时：LDO输出2.493V
+--x=9时：LDO输出2.607V
+--x=10时：LDO输出2.719V
+--x=11时：LDO输出2.831V
+--x=12时：LDO输出2.942V
+--x=13时：LDO输出3.054V
+--x=14时：LDO输出3.165V
+--x=15时：LDO输出3.177V
+--除了上面列举出的GPIO外，其余的GPIO不需要打开特定的电压域，可以直接配置工作
 function setup(pin, val, pull)
     -- 关闭该IO
     pio.pin.close(pin)
