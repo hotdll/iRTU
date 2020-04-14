@@ -192,7 +192,7 @@ elseif is8910 then
         pio0 = pins.setup(0, nil, pio.PULLDOWN),
         pio2 = pins.setup(2, nil, pio.PULLDOWN),
         pio3 = pins.setup(3, nil, pio.PULLDOWN),
-        -- pio6 = pins.setup(6, nil, pio.PULLDOWN),
+        pio6 = pins.setup(6, nil, pio.PULLDOWN),
         pio7 = pins.setup(7, nil, pio.PULLDOWN),
         pio9 = pins.setup(9, nil, pio.PULLDOWN),
         pio10 = pins.setup(10, nil, pio.PULLDOWN),
@@ -426,6 +426,7 @@ cmd.rrpc = {
     ["getvbatt"] = function(t) return "rrpc,getvbatt," .. misc.getVbatt() end,
     ["geticcid"] = function(t) return "rrpc,geticcid," .. (sim.getIccid() or "error") end,
     ["getproject"] = function(t) return "rrpc,getproject," .. _G.PROJECT end,
+    ["getcorever"] = function(t) return "rrpc,getcorever," .. rtos.get_version() end,
     ["getlocation"] = function(t) return "rrpc,location," .. (lbs.lat or 0) .. "," .. (lbs.lng or 0) end,
     ["getreallocation"] = function(t)
         lbsLoc.request(function(result, lat, lng, addr)
@@ -469,7 +470,7 @@ local function read(uid)
     -- 串口流量统计
     flowCount[uid] = flowCount[uid] + #s
     -- log.info("UART_" .. uid .. "read length:", #s)
-    log.info("UART_" .. uid .. "read:", (s:toHex()))
+    log.info("UART_" .. uid .. "read:", #s, (s:sub(1, 100):toHex()))
     log.info("串口流量统计值:", flowCount[uid])
     -- 根据透传标志位判断是否解析数据
     if s:sub(1, 3) == "+++" or s:sub(1, 5):match("(.+)\r\n") == "+++" then
@@ -575,9 +576,7 @@ end
 
 -- uart 的初始化配置函数
 function uart_INIT(i, uconf)
-    local id = (is8910 and i == 2) and 3 or i
-    if id == 3 then return end
-    uart.setup(id, uconf[i][2], uconf[i][3], uconf[i][4], uconf[i][5], nil, 1)
+    uart.setup(i, uconf[i][2], uconf[i][3], uconf[i][4], uconf[i][5], nil, 1)
     uart.on(i, "sent", writeDone)
     uart.on(i, "receive", function(uid, length)
         table.insert(recvBuff[uid], uart.read(uid, length or 8192))
