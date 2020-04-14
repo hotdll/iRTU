@@ -716,7 +716,7 @@ end)
 -- 初始化配置UART1和UART2
 local uidgps = dtu.gps and dtu.gps.fun and tonumber(dtu.gps.fun[1])
 if uidgps ~= 1 and dtu.uconf and dtu.uconf[1] and tonumber(dtu.uconf[1][1]) == 1 then uart_INIT(1, dtu.uconf) end
---if uidgps ~= 2 and dtu.uconf and dtu.uconf[2] and tonumber(dtu.uconf[2][1]) == 2 then uart_INIT(2, dtu.uconf) end
+if uidgps ~= 2 and dtu.uconf and dtu.uconf[2] and tonumber(dtu.uconf[2][1]) == 2 then uart_INIT(2, dtu.uconf) end
 -- 启动GPS任务
 if uidgps then
     -- 从pios列表去掉自定义的io
