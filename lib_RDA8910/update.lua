@@ -5,7 +5,6 @@
 -- @license MIT
 -- @copyright openLuat
 -- @release 2018.03.29
-
 require "misc"
 require "http"
 require "log"
@@ -13,33 +12,33 @@ require "common"
 
 module(..., package.seeall)
 
-local sUpdating,sCbFnc,sUrl,sPeriod,SRedir,sLocation,fotastart
+local sUpdating, sCbFnc, sUrl, sPeriod, SRedir, sLocation, fotastart
 local sProcessedLen = 0
 --local sBraekTest = 0
 local httpRspCode
 
-local function httpDownloadCbFnc(result,statusCode,head)
-    log.info("update.httpDownloadCbFnc",result,statusCode,head,sCbFnc,sPeriod)
-    sys.publish("UPDATE_DOWNLOAD",result,statusCode,head)
+local function httpDownloadCbFnc(result, statusCode, head)
+    log.info("update.httpDownloadCbFnc", result, statusCode, head, sCbFnc, sPeriod)
+    sys.publish("UPDATE_DOWNLOAD", result, statusCode, head)
 end
 
-local function processOta(stepData,totalLen,statusCode)
+local function processOta(stepData, totalLen, statusCode)
     if stepData and totalLen then
-        if statusCode=="200" or statusCode=="206" then            
-            if rtos.fota_process((sProcessedLen+stepData:len()>totalLen) and stepData:sub(1,totalLen-sProcessedLen) or stepData,totalLen)~=0 then 
-                log.error("update.processOta","fail")
+        if statusCode == "200" or statusCode == "206" then
+            if rtos.fota_process((sProcessedLen + stepData:len() > totalLen) and stepData:sub(1, totalLen - sProcessedLen) or stepData, totalLen) ~= 0 then
+                log.error("update.processOta", "fail")
                 return false
             else
                 sProcessedLen = sProcessedLen + stepData:len()
-                log.info("update.processOta",totalLen,sProcessedLen,(sProcessedLen*100/totalLen).."%")
+                log.info("update.processOta", totalLen, sProcessedLen, (sProcessedLen * 100 / totalLen) .. "%")
                 --if sProcessedLen*100/totalLen==sBraekTest then return false end
-                if sProcessedLen*100/totalLen>=100 then return true end
+                if sProcessedLen * 100 / totalLen >= 100 then return true end
             end
-        elseif statusCode:sub(1,1)~="3" and stepData:len()==totalLen and totalLen>0 then
-            if totalLen<=200 then
+        elseif statusCode:sub(1, 1) ~= "3" and stepData:len() == totalLen and totalLen > 0 then
+            if totalLen <= 200 then
                 local msg = stepData:match("\"msg\":%s*\"(.-)\"")
-                if msg and msg:len()<=200 then
-                    log.warn("update.error",common.ucs2beToUtf8((msg:gsub("\\u","")):fromHex()))
+                if msg and msg:len() <= 200 then
+                    log.warn("update.error", common.ucs2beToUtf8((msg:gsub("\\u", "")):fromHex()))
                 end
             end
             httpRspCode = stepData:match("\"code\":%s*(%d+)")
@@ -56,34 +55,34 @@ function clientTask()
         sProcessedLen = 0
         while true do
             --sBraekTest = sBraekTest+30
-            log.info("update.http.request",sLocation,sUrl,sProcessedLen,sBraekTest,fotastart)
+            log.info("update.http.request", sLocation, sUrl, sProcessedLen, sBraekTest, fotastart)
             if not fotastart then break end
             local coreVer = rtos.get_version()
-            local coreName1,coreName2 = coreVer:match("(.-)_V%d+(_.+)")
+            local coreName1, coreName2 = coreVer:match("(.-)_V%d+(_.+)")
             local coreVersion = tonumber(coreVer:match(".-_V(%d+)"))
             httpRspCode = nil
             http.request("GET",
-                     sLocation or ((sUrl or "iot.openluat.com/api/site/firmware_upgrade").."?project_key=".._G.PRODUCT_KEY
-                            .."&imei="..misc.getImei()
-                            .."&firmware_name=".._G.PROJECT.."_"..coreName1..coreName2.."&core_version="..coreVersion.."&dfota=1&version=".._G.VERSION..(sRedir and "&need_oss_url=1" or "")),
-                     nil,{["Range"]="bytes="..sProcessedLen.."-"},nil,60000,httpDownloadCbFnc,processOta)
-                     
-            local _,result,statusCode,head = sys.waitUntil("UPDATE_DOWNLOAD")
-            log.info("update.waitUntil UPDATE_DOWNLOAD",result,statusCode,httpRspCode)
+                sLocation or ((sUrl or "iot.openluat.com/api/site/firmware_upgrade") .. "?project_key=" .. _G.PRODUCT_KEY
+                .. "&imei=" .. misc.getImei() .. "&iccid=" .. sim.getIccid()
+                .. "&firmware_name=" .. _G.PROJECT .. "_" .. coreName1 .. coreName2 .. "&core_version=" .. coreVersion .. "&dfota=1&version=" .. _G.VERSION .. (sRedir and "&need_oss_url=1" or "")),
+                nil, {["Range"] = "bytes=" .. sProcessedLen .. "-"}, nil, 60000, httpDownloadCbFnc, processOta)
+            
+            local _, result, statusCode, head = sys.waitUntil("UPDATE_DOWNLOAD")
+            log.info("update.waitUntil UPDATE_DOWNLOAD", result, statusCode, httpRspCode)
             if result then
-                local needBreak                
-                if statusCode=="200" or statusCode=="206" then
+                local needBreak
+                if statusCode == "200" or statusCode == "206" then
                     needBreak = true
                     if sCbFnc then
                         sCbFnc(true)
                     else
                         sys.restart("UPDATE_DOWNLOAD_SUCCESS")
                     end
-                elseif statusCode:sub(1,1)=="3" and head and head["Location"] then
+                elseif statusCode:sub(1, 1) == "3" and head and head["Location"] then
                     sLocation = head["Location"]
                     sys.wait(2000)
-                elseif httpRspCode=="43" then
-                    log.info("update.clientTask","wait server create fota")
+                elseif httpRspCode == "43" then
+                    log.info("update.clientTask", "wait server create fota")
                     sys.wait(30000)
                 else
                     if sCbFnc then sCbFnc(false) end
@@ -91,12 +90,12 @@ function clientTask()
                 end
                 
                 if needBreak then
-                    log.info("update.rtos.fota_end",rtos.fota_end())
+                    log.info("update.rtos.fota_end", rtos.fota_end())
                     break
                 end
             else
-                retryCnt = retryCnt+1
-                if retryCnt==30 then
+                retryCnt = retryCnt + 1
+                if retryCnt == 30 then
                     rtos.fota_end()
                     if sCbFnc then sCbFnc(false) end
                     break
@@ -108,8 +107,8 @@ function clientTask()
         
         if sPeriod then
             sys.wait(sPeriod)
-            if rtos.fota_start()~=0 then 
-                log.error("update.request","fota_start fail")
+            if rtos.fota_start() ~= 0 then
+                log.error("update.request", "fota_start fail")
                 fotastart = false
             else
                 fotastart = true
@@ -144,17 +143,17 @@ end
 -- update.request(cbFnc,"www.userserver.com/update")
 -- update.request(cbFnc,nil,4*3600*1000)
 -- update.request(cbFnc,nil,4*3600*1000,true)
-function request(cbFnc,url,period,redir)
-    if rtos.fota_start()~=0 then 
-        log.error("update.request","fota_start fail")
+function request(cbFnc, url, period, redir)
+    if rtos.fota_start() ~= 0 then
+        log.error("update.request", "fota_start fail")
         fotastart = false
         return
     else
         fotastart = true
     end
-    sCbFnc,sUrl,sPeriod,sRedir = cbFnc or sCbFnc,url or sUrl,period or sPeriod,sRedir or redir
-    log.info("update.request",sCbFnc,sUrl,sPeriod,sRedir)
-    if not sUpdating then        
+    sCbFnc, sUrl, sPeriod, sRedir = cbFnc or sCbFnc, url or sUrl, period or sPeriod, sRedir or redir
+    log.info("update.request", sCbFnc, sUrl, sPeriod, sRedir)
+    if not sUpdating then
         sys.taskInit(clientTask)
     end
 end

@@ -340,7 +340,7 @@ function write(uid, str)
         if 0 ~= uart.write(uid, writeBuff[uid][1]) then
             table.remove(writeBuff[uid], 1)
             writeIdle[uid] = false
-            log.warn("UART_" .. uid .. "writing ...")
+            log.warn("UART_" .. uid .. " writing ...")
         end
     end
 end
@@ -577,7 +577,7 @@ end
 
 -- uart 的初始化配置函数
 function uart_INIT(i, uconf)
-    if (is8910 and i == 2) then return end
+    if (is8910 and i == 2) or i == 3 then return end
     uart.setup(i, uconf[i][2], uconf[i][3], uconf[i][4], uconf[i][5], nil, 1)
     uart.on(i, "sent", writeDone)
     uart.on(i, "receive", function(uid, length)
@@ -816,5 +816,5 @@ end
 sys.timerLoopStart(function()
     log.info("打印占用的内存:", _G.collectgarbage("count"))-- 打印占用的RAM
     log.info("打印可用的空间", rtos.get_fs_free_size())-- 打印剩余FALSH，单位Byte
---socket.printStatus()
+-- socket.printStatus()
 end, 10000)
