@@ -577,7 +577,7 @@ end
 
 -- uart 的初始化配置函数
 function uart_INIT(i, uconf)
-    if (is8910 and i == 2) or i == 3 then return end
+    if not is8910 and i == 3 then return end
     uart.setup(i, uconf[i][2], uconf[i][3], uconf[i][4], uconf[i][5], nil, 1)
     uart.on(i, "sent", writeDone)
     uart.on(i, "receive", function(uid, length)
@@ -600,7 +600,27 @@ function uart_INIT(i, uconf)
     end)
     -- 485方向控制
     if not dtu.uconf[i][6] or dtu.uconf[i][6] == "" then -- 这么定义是为了和之前的代码兼容
-        default["dir" .. i] = i == 1 and (is1802S and 61 or (is4gLod and 23 or 2)) or (is1802S and 32 or (is4gLod and 59 or 6))
+        if i == 1 then
+            if is8910 then
+                default["dir1"] = 18
+            elseif is1802S then
+                default["dir1"] = 61
+            elseif is4gLod then
+                default["dir1"] = 23
+            else
+                default["dir1"] = 2
+            end
+        elseif i == 2 then
+            if is8910 then
+                default["dir2"] = 23
+            elseif is1802S then
+                default["dir2"] = 32
+            elseif is4gLod then
+                default["dir2"] = 59
+            else
+                default["dir2"] = 6
+            end
+        end
     else
         if pios[dtu.uconf[i][6]] then
             default["dir" .. i] = tonumber(dtu.uconf[i][6]:sub(4, -1))
@@ -717,6 +737,7 @@ end)
 local uidgps = dtu.gps and dtu.gps.fun and tonumber(dtu.gps.fun[1])
 if uidgps ~= 1 and dtu.uconf and dtu.uconf[1] and tonumber(dtu.uconf[1][1]) == 1 then uart_INIT(1, dtu.uconf) end
 if uidgps ~= 2 and dtu.uconf and dtu.uconf[2] and tonumber(dtu.uconf[2][1]) == 2 then uart_INIT(2, dtu.uconf) end
+if is8910 and uidgps ~= 3 and dtu.uconf and dtu.uconf[3] and tonumber(dtu.uconf[3][1]) == 3 then uart_INIT(3, dtu.uconf) end
 -- 启动GPS任务
 if uidgps then
     -- 从pios列表去掉自定义的io
