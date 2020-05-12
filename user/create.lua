@@ -241,7 +241,7 @@ local function mqttTask(cid, pios, reg, convert, passon, upprot, dwprot, keepAli
                     elseif convert == 1 then -- 转换为HEX String
                         sys.publish("UART_SENT_RDY_" .. uid, uid, (packet.payload:fromHex()))
                     elseif convert == 0 and dwprotFnc then -- 转换用户自定义报文
-                        local res, msg = pcall(dwprotFnc, packet.payload)
+                        local res, msg = pcall(dwprotFnc, packet.payload, packet.topic)
                         if not res or not msg then
                             log.error("数据流模版错误:", msg)
                         else

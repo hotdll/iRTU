@@ -577,7 +577,6 @@ end
 
 -- uart 的初始化配置函数
 function uart_INIT(i, uconf)
-    if not is8910 and i == 3 then return end
     uart.setup(i, uconf[i][2], uconf[i][3], uconf[i][4], uconf[i][5], nil, 1)
     uart.on(i, "sent", writeDone)
     uart.on(i, "receive", function(uid, length)
@@ -656,36 +655,9 @@ sys.taskInit(function()
                 rst = true
             end
         end
-        
         -- 检查是否有更新程序
         if tonumber(dtu.fota) == 1 then
             log.info("----- update firmware:", "start!")
-            -- if (is4gLod) and rtos.fota_start() == 0 then
-            --     if is8910 then
-            --         local coreVer = rtos.get_version()
-            --         local coreName1, coreName2 = coreVer:match("(.-)_V%d+(_.+)")
-            --         local coreVersion = tonumber(coreVer:match(".-_V(%d+)"))
-            --         url = "iot.openluat.com/api/site/firmware_upgrade?project_key=" .. _G.PRODUCT_KEY
-            --             .. "&imei=" .. misc.getImei()
-            --             .. "&firmware_name=" .. _G.PROJECT .. "_" .. coreName1 .. coreName2 .. "&core_version=" .. coreVersion .. "&dfota=1&version=" .. _G.VERSION
-            --     else
-            --         url = "iot.openluat.com/api/site/firmware_upgrade?project_key=" .. _G.PRODUCT_KEY
-            --             .. "&imei=" .. misc.getImei() .. "&device_key=" .. misc.getSn()
-            --             .. "&firmware_name=" .. _G.PROJECT .. "_" .. rtos.get_version() .. "&version=" .. _G.VERSION
-            --     end
-            --     code, head, body = httpv2.request("GET", url, 30000, nil, nil, nil, nil, nil, nil, rtos.fota_process)
-            --     if tonumber(code) == 200 or tonumber(code) == 206 then rst = true end
-            --     rtos.fota_end()
-            -- elseif not is4gLod then
-            --     url = "iot.openluat.com/api/site/firmware_upgrade?project_key=" .. _G.PRODUCT_KEY
-            --         .. "&imei=" .. misc.getImei() .. "&device_key=" .. misc.getSn()
-            --         .. "&firmware_name=" .. _G.PROJECT .. "_" .. rtos.get_version() .. "&version=" .. _G.VERSION
-            --     code, head, body = httpv2.request("GET", url, 30000)
-            --     if tonumber(code) == 200 and body and #body > 1024 then
-            --         io.writeFile("/luazip/update.bin", body)
-            --         rst = true
-            --     end
-            -- end
             update.request(function(res)
                 sys.publish("IRTU_UPDATE_RES", res == true)
             end, nil, 86400000)
