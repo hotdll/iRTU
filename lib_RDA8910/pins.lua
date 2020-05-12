@@ -31,8 +31,8 @@ local dirs = {}
 --执行getInputFnc()即可获得当前电平；如果是低电平，getInputFnc()返回0；如果是高电平，getInputFnc()返回1
 -- @usage
 --有些GPIO需要打开对应的ldo电压域之后，才能正常配置工作，电压域和对应的GPIO关系如下
---pmd.ldoset(x,pmd.LDO_VSIM2) -- GPIO 29、30、31 --目前core版本还不支持
---pmd.ldoset(x,pmd.LDO_VLCD) -- GPIO 0、1、2、3、4、6  --目前core版本，x还控制不了不同等级的电压，都是1.8V
+--pmd.ldoset(x,pmd.LDO_VSIM1) -- GPIO 29、30、31
+--pmd.ldoset(x,pmd.LDO_VLCD) -- GPIO 0、1、2、3、4
 --pmd.ldoset(x,pmd.LDO_VMMC) -- GPIO 24、25、26、27、28
 --x=0时：关闭LDO
 --x=1时：LDO输出1.716V

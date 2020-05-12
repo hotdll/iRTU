@@ -63,7 +63,7 @@ function clientTask()
             httpRspCode = nil
             http.request("GET",
                 sLocation or ((sUrl or "iot.openluat.com/api/site/firmware_upgrade") .. "?project_key=" .. _G.PRODUCT_KEY
-                .. "&imei=" .. misc.getImei() .. "&iccid=" .. sim.getIccid()
+                .. "&imei=" .. misc.getImei()
                 .. "&firmware_name=" .. _G.PROJECT .. "_" .. coreName1 .. coreName2 .. "&core_version=" .. coreVersion .. "&dfota=1&version=" .. _G.VERSION .. (sRedir and "&need_oss_url=1" or "")),
                 nil, {["Range"] = "bytes=" .. sProcessedLen .. "-"}, nil, 60000, httpDownloadCbFnc, processOta)
             

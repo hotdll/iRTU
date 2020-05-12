@@ -49,14 +49,6 @@ local function rsp(cmd, success, response, intermediate)
         sys.publish('IMEI_READY_IND')
     elseif cmd == 'AT+VER' then
         ver = intermediate
-    --查询是否校准
-    elseif cmd == "AT+ATWMFT=99" then
-        log.info('misc.ATWMFT', intermediate)
-        if intermediate == "SUCC" then
-            calib = true
-        else
-            calib = false
-        end
     elseif prefix == '+CCLK' then
         if success then
             sys.publish('TIME_UPDATE_IND')
@@ -209,7 +201,6 @@ function closePwm(id)
 end
 
 --注册以下AT命令的应答处理函数
-ril.regRsp("+ATWMFT", rsp)
 ril.regRsp("+WISN", rsp)
 ril.regRsp("+CGSN", rsp)
 ril.regRsp("+MUID", rsp)
@@ -217,8 +208,6 @@ ril.regRsp("+WIMEI", rsp)
 ril.regRsp("+AMFAC", rsp)
 ril.regRsp('+VER', rsp, 4, '^[%w_]+$')
 req('AT+VER')
---查询是否校准
-req("AT+ATWMFT=99")
 --查询序列号
 req("AT+WISN?")
 --查询IMEI

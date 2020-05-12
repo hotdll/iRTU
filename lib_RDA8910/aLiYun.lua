@@ -179,6 +179,7 @@ function clientAuthTask()
                      
             local _,result,statusCode,body = sys.waitUntil("ALIYUN_AUTH_IND")
             --log.info("aLiYun.clientAuthTask1",result and statusCode=="200",body)
+            local invalidSign
             if result and statusCode=="200" then
                 local tJsonDecode,result = json.decode(body)
                 --log.info("aLiYun.clientAuthTask2",result,tJsonDecode["message"],tJsonDecode["data"])
@@ -198,9 +199,12 @@ function clientAuthTask()
                         return
                     end
                 end
+                if body and body:match("invalid sign") then
+                    invalidSign = true
+                end
             end
-            
-            if sProductSecret then                
+
+            if sProductSecret and invalidSign then
                 http.request("POST","https://iot-auth.cn-shanghai.aliyuncs.com/auth/register/device",nil,
                     {['Content-Type']="application/x-www-form-urlencoded"},
                     getBody("register"),30000,getDeviceSecretCb)

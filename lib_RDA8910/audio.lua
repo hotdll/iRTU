@@ -44,6 +44,11 @@ local audioQueue = {}
 --sStrategy：优先级相同时的播放策略，0(表示继续播放正在播放的音频，忽略请求播放的新音频)，1(表示停止正在播放的音频，播放请求播放的新音频)
 local sStrategy
 
+local function isTtsStopResultValid()
+    return tonumber(string.match(rtos.get_version(),"Luat_V(%d+)_"))>=8
+end
+
+
 local function handleCb(item,result)
     log.info("audio.handleCb",item.cbFnc,result)
     if item.cbFnc then item.cbFnc(result) end
@@ -53,7 +58,7 @@ end
 local function handlePlayInd(item,key,value)
     log.info("audio.handlePlayInd",key,value)
     --播放结束
-    if key=="RESULT" then                        
+    if key=="RESULT" then
         --播放成功
         if value then
             if item.dup then
@@ -66,7 +71,7 @@ local function handlePlayInd(item,key,value)
                         handleCb(item,reason=="NEW" and 4 or 5)
                     end
                 end
-            else                                
+            else
                 handleCb(item,0)
             end
         --播放失败
@@ -82,21 +87,21 @@ local function handlePlayInd(item,key,value)
     elseif key=="STOP" then
         log.warn("audio.handlePlayInd",item.type,"stop error",result)
         handleCb(item,5)
-    end 
+    end
 end
 
 local ttsEngineInited
 
-local function audioTask()    
+local function audioTask()
     while true do
         if #audioQueue==0 then
             log.info("audioTask","wait LIB_AUDIO_PLAY_ENTRY")
             sys.waitUntil("LIB_AUDIO_PLAY_ENTRY")
-        end        
-               
-        local item = audioQueue[1] 
+        end
 
-        log.info("audioTask",item.type,"#audioQueue",#audioQueue)        
+        local item = audioQueue[1]
+
+        log.info("audioTask",item.type,"#audioQueue",#audioQueue)
         if item.type=="FILE" then
             --队列中有优先级高的请求等待处理
             if #audioQueue>1 then
@@ -116,14 +121,14 @@ local function audioTask()
                     log.info("audioTask",item.type,"wait LIB_AUDIO_PLAY_IND")
                     local _,key,value = sys.waitUntil("LIB_AUDIO_PLAY_IND")
                     log.info("audioTask",item.type,"recv LIB_AUDIO_PLAY_IND",key,value)
-                    
+
                     audiocore.stop()
-                    handlePlayInd(item,key,value)                    
+                    handlePlayInd(item,key,value)
                 else
                     log.warn("audioTask",item.type,"audiocore.play error")
                     audiocore.stop()
                     handleCb(item,1)
-                end                
+                end
             end
         elseif item.type=="TTS" or item.type=="TTSCC" then
             --队列中有优先级高的请求等待处理
@@ -138,34 +143,49 @@ local function audioTask()
                         ttsply.initEngine()
                         ttsEngineInited = true
                     end
-                    ttsply.setParm(1,ttsSpeed)
+                    ttsply.setParm(0,ttsSpeed)
                     --队列中有优先级高的请求等待处理
                     if #audioQueue>1 then
                         log.warn("audioTask",item.type,"priority low1")
-                        ttsply.stop()
-                        sys.waitUntil("LIB_AUDIO_PLAY_IND",500)
+                        if isTtsStopResultValid() then
+                            if ttsply.stop() then
+                                sys.waitUntil("LIB_AUDIO_PLAY_IND",2000)
+                            end
+                        else
+                            ttsply.stop()
+                            sys.waitUntil("LIB_AUDIO_PLAY_IND",500)
+                        end
                         local behind = audioQueue[2]
                         handleCb(item,behind.type=="STOP" and 5 or 4)
                     else
                         ttsply.play(common.utf8ToGb2312(item.path))
-                        
+
                         --等待三种消息（播放结束、主动调用audio.stop、新的优先级更高的播放请求）
                         log.info("audioTask",item.type,"wait LIB_AUDIO_PLAY_IND")
                         local _,key,value = sys.waitUntil("LIB_AUDIO_PLAY_IND")
                         log.info("audioTask",item.type,"recv LIB_AUDIO_PLAY_IND",key,value)
-                        
+
                         if item.type=="TTS" then
-                            ttsply.stop()
-                            sys.waitUntil("LIB_AUDIO_PLAY_IND",500)
+                            if isTtsStopResultValid() then
+                                --log.info("tts 1")
+                                if ttsply.stop() then
+                                    --log.info("tts 2")
+                                    sys.waitUntil("LIB_AUDIO_PLAY_IND",2000)
+                                end
+                                --log.info("tts 3")
+                            else
+                                ttsply.stop()
+                                sys.waitUntil("LIB_AUDIO_PLAY_IND",500)
+                            end                            
                         else
-                            
+
                         end
-                        
+
                         handlePlayInd(item,key,value)
                     end
                 else
-                    
-                end         
+
+                end
             end
         elseif item.type=="RECORD" then
             --队列中有优先级高的请求等待处理
@@ -177,22 +197,22 @@ local function audioTask()
                 setVolume(item.vol)
                 f,d=record.getSize()
                 req("AT+AUDREC=1,0,2,"..item.path..","..d*1000)
-                
+
                 --等待三种消息（播放结束、主动调用audio.stop、新的优先级更高的播放请求）
                 log.info("audioTask",item.type,"wait LIB_AUDIO_PLAY_IND")
                 local _,key,value = sys.waitUntil("LIB_AUDIO_PLAY_IND")
                 log.info("audioTask",item.type,"recv LIB_AUDIO_PLAY_IND",key,value)
-                
+
                 req("AT+AUDREC=1,0,3,"..item.path..","..d*1000)
                 sys.waitUntil("LIB_AUDIO_RECORD_STOP_RESULT")
-                
+
                 handlePlayInd(item,key,value)
             end
         elseif item.type=="STOP" then
             if item.cbFnc then item.cbFnc(0) end
             table.remove(audioQueue,1)
         end
-    end        
+    end
 end
 
 --- 播放音频
@@ -225,9 +245,9 @@ function play(priority,type,path,vol,cbFnc,dup,dupInterval)
     if not taskID then
         taskID = sys.taskInit(audioTask)
     end
-    
+
     local item = {priority=priority,type=type,path=path,vol=vol or 4,cbFnc=cbFnc,dup=dup,dupInterval=dupInterval or 0}
-    
+
     if #audioQueue==0 then
         table.insert(audioQueue,item)
         sys.publish("LIB_AUDIO_PLAY_ENTRY")
@@ -244,8 +264,8 @@ function play(priority,type,path,vol,cbFnc,dup,dupInterval)
                 if cbFnc then cbFnc(2) end
             end
         end
-    end 
-    
+    end
+
     return true
 end
 
@@ -263,7 +283,7 @@ function stop(cbFnc)
     else
         table.insert(audioQueue,{type="STOP",cbFnc=cbFnc})
         sys.publish("LIB_AUDIO_PLAY_IND","STOP")
-    end    
+    end
 end
 
 local function audioMsg(msg)
@@ -331,6 +351,21 @@ function setTTSSpeed(speed)
         ttsSpeed = speed
         return true
     end
+end
+
+--- 设置音频输出通道
+-- 设置后实时生效
+-- @number[opt=2] channel，1：headphone耳机    2：speaker喇叭
+-- @return nil
+-- @usage
+-- 设置为耳机输出：audio.setChannel(1)
+-- 设置为喇叭输出：audio.setChannel(2)
+function setChannel(channel)
+    if tonumber(string.match(rtos.get_version(),"Luat_V(%d+)_"))>=9 then
+        audiocore.setchannel(channel)
+    else
+        ril.request("AT+AUDCH="..(channel==1 and 1 or 2))
+    end    
 end
 
 
